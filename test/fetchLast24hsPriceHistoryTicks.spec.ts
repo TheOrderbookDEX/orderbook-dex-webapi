@@ -1,0 +1,81 @@
+import { use, expect } from 'chai';
+import chaiAsPromised from 'chai-as-promised';
+import addContext from 'mochawesome/addContext';
+import { fetchOrderbook } from '../src/Orderbook';
+import { Chain, ChainInternal } from '../src/Chain';
+import { fetchLast24hsPriceHistoryTicks, PriceHistoryTickInternal } from '../src/PriceHistory';
+import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-provider';
+import { resetIndexedDB } from './indexeddb';
+import { setUpSmartContracts, simulateTicks } from './smart-contracts';
+import { OrderbookDEX, OrderbookDEXInternal } from '../src/OrderbookDEX';
+import { Cache } from '../src/Cache';
+import { fetchLast24hsPriceHistoryTicksScenarios } from './scenarios/fetchLast24hsPriceHistoryTicks';
+import { getBlockNumber } from '@theorderbookdex/abi2ts-lib';
+import { Address } from '../src/Address';
+
+use(chaiAsPromised);
+
+const testOrderbook = '0xEbF7a4c0856859eE173FAc8Cc7eb0488950538fb' as Address;
+
+describe('fetchLast24hsPriceHistoryTicks', function() {
+    beforeEach(async function() {
+        await setUpEthereumProvider();
+        await Chain.connect();
+        await setUpSmartContracts();
+        await OrderbookDEX.connect();
+    });
+
+    afterEach(async function() {
+        OrderbookDEXInternal.disconnect();
+        ChainInternal.disconnect();
+        await tearDownEthereumProvider();
+        resetIndexedDB();
+        Cache.reset();
+    });
+
+    for (const scenario of fetchLast24hsPriceHistoryTicksScenarios) {
+        (scenario.only ? describe.only : describe)(scenario.description, function() {
+            let firstTickBlockNumber: number;
+
+            function toBlockNumber(index: number) {
+                return firstTickBlockNumber + index * 2;
+            }
+
+            beforeEach(async function() {
+                addContext(this, {
+                    title: 'existingTicks',
+                    value: scenario.existingTicks.map(String),
+                });
+                addContext(this, {
+                    title: 'secondsBetweenTicks',
+                    value: scenario.secondsBetweenTicks,
+                });
+                addContext(this, {
+                    title: 'fetchedBlock',
+                    value: scenario.fetchedBlock,
+                });
+                addContext(this, {
+                    title: 'expectedTicks',
+                    value: scenario.expectedTicks.map(String),
+                });
+                await simulateTicks(testOrderbook, scenario.existingTicks, scenario.secondsBetweenTicks);
+                const latestBlockNumber = await getBlockNumber();
+                firstTickBlockNumber = latestBlockNumber - (scenario.existingTicks.length - 1) * 2
+            });
+
+            it('should return expected ticks', async function() {
+                const orderbook = await fetchOrderbook(testOrderbook);
+                const ticks: PriceHistoryTickInternal[] = [];
+                for await (const tick of fetchLast24hsPriceHistoryTicks(testOrderbook, scenario.fetchedBlock(toBlockNumber))) {
+                    ticks.push(tick);
+                }
+                expect(ticks)
+                    .to.have.length(scenario.expectedTicks.length);
+                for (const [ index, tick ] of ticks.entries()) {
+                    expect(tick.price)
+                        .to.be.equal(scenario.expectedTicks[index] * orderbook.priceTick);
+                }
+            });
+        });
+    }
+});

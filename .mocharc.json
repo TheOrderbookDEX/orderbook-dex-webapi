@@ -1,0 +1,18 @@
+{
+  "timeout": 0,
+  "slow": 100000,
+  "require": [
+    "ts-node/register"
+  ],
+  "extension": [
+    "spec.ts"
+  ],
+  "reporter": "mochawesome",
+  "reporter-option": [
+    "quiet=true",
+    "code=false",
+    "inline=true",
+    "reportDir=test-report",
+    "reportFilename=report"
+  ]
+}
