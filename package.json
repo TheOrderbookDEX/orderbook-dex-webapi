@@ -1,6 +1,6 @@
 {
   "name": "@theorderbookdex/orderbook-dex-webapi",
-  "version": "0.1.0-rc.0",
+  "version": "0.1.0-rc.1",
   "description": "This package provides a web service like interface to The Orderbook DEX on-chain data",
   "license": "BUSL-1.1",
   "author": "The Orderbook DEX Team",
@@ -13,9 +13,9 @@
   "dependencies": {
     "@theorderbookdex/abi2ts-lib": "~0.2.0",
     "@theorderbookdex/addressbook": "~1.1.0",
-    "@theorderbookdex/orderbook-dex": "~1.0.0-rc.1",
-    "@theorderbookdex/orderbook-dex-operator": "~1.0.0-rc.1",
-    "@theorderbookdex/orderbook-dex-v1": "~1.0.0-rc.1",
+    "@theorderbookdex/orderbook-dex": "~1.0.0-rc.2",
+    "@theorderbookdex/orderbook-dex-operator": "~1.0.0-rc.2",
+    "@theorderbookdex/orderbook-dex-v1": "~1.0.0-rc.2",
     "idb": "~7.0.2"
   },
   "devDependencies": {
