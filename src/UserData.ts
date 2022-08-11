@@ -247,6 +247,17 @@ interface ChainConfig {
 
 const chainConfigs: { [chainId: number]: ChainConfig | undefined } = {};
 
+chainConfigs[5] = {
+    tokens: [
+        '0xc04b0d3107736c32e19f1c62b2af67be61d63a05' as Address, // WBTC
+        '0xb4fbf271143f4fbf7b91a5ded31805e42b2208d6' as Address, // WETH
+        '0xd87ba7a50b2e7e660f678a895e4b72e7cb4ccd9c' as Address, // USDC
+    ],
+    orderbooks: [
+        '0x24C2d6AA89b3DCC86a4d75cc85727136C5d5872f' as Address, // WBTC/USDC
+    ],
+};
+
 chainConfigs[1337] = {
     tokens: [
         '0x6D411e0A54382eD43F02410Ce1c7a7c122afA6E1' as Address,

@@ -171,6 +171,14 @@ interface ChainConfig {
 
 const chainConfigs: { [chainId: number]: ChainConfig | undefined } = {};
 
+chainConfigs[5] = {
+    operatorFactory: '0x7BF5889661f06B7d287C6acBA754d318F17E4A52' as Address,
+    orderbookFactoryV1: '0xdFbd8e2360B96C0bd4A00d4D1271A33f0C6E75C7' as Address,
+    orderbooks: [
+        '0x24C2d6AA89b3DCC86a4d75cc85727136C5d5872f' as Address, // WBTC/USDC
+    ],
+};
+
 chainConfigs[1337] = {
     operatorFactory: '0xDe09E74d4888Bc4e65F589e8c13Bce9F71DdF4c7' as Address,
     orderbookFactoryV1: '0xB9816fC57977D5A786E654c7CF76767be63b966e' as Address,
