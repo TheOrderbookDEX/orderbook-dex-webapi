@@ -7,8 +7,7 @@ import { fetchAllPriceHistoryBars } from '../src/PriceHistory';
 import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-provider';
 import { resetIndexedDB } from './indexeddb';
 import { setUpSmartContracts, simulatePriceHistory } from './smart-contracts';
-import { OrderbookDEX, OrderbookDEXInternal } from '../src/OrderbookDEX';
-import { Cache } from '../src/Cache';
+import { OrderbookDEX } from '../src/OrderbookDEX';
 import { TimeFrame, PriceHistoryBar } from '../src/PriceHistory';
 import { deepConvertBigIntToString } from './utils';
 import { fetchAllPriceHistoryBarsScenarios } from './scenarios/fetchAllPriceHistoryBars';
@@ -28,11 +27,10 @@ describe('fetchAllPriceHistoryBars', function() {
     });
 
     afterEach(async function() {
-        OrderbookDEXInternal.disconnect();
-        ChainInternal.disconnect();
+        OrderbookDEX.disconnect();
+        Chain.disconnect();
         await tearDownEthereumProvider();
         resetIndexedDB();
-        Cache.reset();
     });
 
     for (const scenario of fetchAllPriceHistoryBarsScenarios) {

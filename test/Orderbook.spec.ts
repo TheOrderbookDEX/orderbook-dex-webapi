@@ -2,13 +2,11 @@ import { getBlockTimestamp } from '@theorderbookdex/abi2ts-lib';
 import { use, expect } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import { Orderbook, OrderbookDEX, OrderType, PricePointAddedEvent, PricePointRemovedEvent, PricePointsEventType, PricePointUpdatedEvent, TimeFrame } from '../src';
-import { Cache } from '../src/Cache';
-import { Chain, ChainInternal } from '../src/Chain';
+import { Chain } from '../src/Chain';
 import { ChainEvents } from '../src/ChainEvents';
-import { OrderbookDEXInternal } from '../src/OrderbookDEX';
 import { PriceChangedEvent, PriceTickerEventType, PriceTickerInternal } from '../src/PriceTicker';
 import { now } from '../src/time';
-import { UserData, UserDataInternal } from '../src/UserData';
+import { UserData } from '../src/UserData';
 import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-provider';
 import { resetIndexedDB } from './indexeddb';
 import { fillOrders, placeOrders, setUpSmartContracts, simulatePriceHistory, simulatePricePoints, simulateTicks } from './smart-contracts';
@@ -49,12 +47,11 @@ describe('Orderbook', function() {
     });
 
     afterEach(async function() {
-        UserDataInternal.unload();
-        OrderbookDEXInternal.disconnect();
-        ChainInternal.disconnect();
+        UserData.unload();
+        OrderbookDEX.disconnect();
+        Chain.disconnect();
         await tearDownEthereumProvider();
         resetIndexedDB();
-        Cache.reset();
     });
 
     describe('getPricePoints', function() {

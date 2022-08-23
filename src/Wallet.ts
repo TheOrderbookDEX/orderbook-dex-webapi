@@ -88,6 +88,13 @@ export abstract class Wallet extends EventTarget {
     }
 
     /**
+     * Disconnect from the wallet.
+     */
+    static disconnect(): void {
+        WalletInternal.disconnect();
+    }
+
+    /**
      * The address of the wallet.
      */
     abstract get address(): Address;

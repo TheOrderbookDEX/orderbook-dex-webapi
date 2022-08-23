@@ -50,7 +50,7 @@ export class Cache {
         return this._instance;
     }
 
-    static reset() {
+    static unload() {
         delete this._instance;
     }
 

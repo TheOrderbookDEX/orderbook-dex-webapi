@@ -30,6 +30,13 @@ export abstract class Chain {
     }
 
     /**
+     * Disconnect from the blockchain.
+     */
+    static disconnect(): void {
+        ChainInternal.disconnect();
+    }
+
+    /**
      * The id of the chain.
      */
     abstract get chainId(): number;
@@ -73,6 +80,7 @@ export class ChainInternal extends Chain {
 
     static disconnect() {
         ChainEvents.stop();
+        Cache.unload();
         this._instance = undefined;
     }
 

@@ -1,9 +1,8 @@
 import { use, expect } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import { Orderbook, OrderbookDEX } from '../src';
-import { Chain, ChainNotConnected, ChainInternal } from '../src/Chain';
-import { OrderbookDEXInternal } from '../src/OrderbookDEX';
-import { UserData, UserDataInternal, UserDataNotLoaded } from '../src/UserData';
+import { Chain, ChainNotConnected } from '../src/Chain';
+import { UserData, UserDataNotLoaded } from '../src/UserData';
 import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-provider';
 import { resetIndexedDB } from './indexeddb';
 import { setUpSmartContracts } from './smart-contracts';
@@ -102,8 +101,8 @@ describe('UserData', function() {
                 });
 
                 afterEach(function() {
-                    UserDataInternal.unload();
-                    ChainInternal.disconnect();
+                    UserData.unload();
+                    Chain.disconnect();
                 });
 
                 it('should provide UserData instance', async function() {
@@ -119,7 +118,7 @@ describe('UserData', function() {
             });
 
             afterEach(function() {
-                ChainInternal.disconnect();
+                Chain.disconnect();
             });
 
             describe('before load', function() {
@@ -135,7 +134,7 @@ describe('UserData', function() {
                 });
 
                 afterEach(async function() {
-                    UserDataInternal.unload();
+                    UserData.unload();
                 });
 
                 it('should not fail', function() {
@@ -155,9 +154,9 @@ describe('UserData', function() {
         });
 
         afterEach(async function() {
-            OrderbookDEXInternal.disconnect();
-            UserDataInternal.unload();
-            ChainInternal.disconnect();
+            OrderbookDEX.disconnect();
+            UserData.unload();
+            Chain.disconnect();
             await tearDownEthereumProvider();
             resetIndexedDB();
         });

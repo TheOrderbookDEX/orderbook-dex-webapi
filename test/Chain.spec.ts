@@ -1,6 +1,6 @@
 import { use, expect } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
-import { Chain, ChainConnectionFailed, ChainNotConnected, ChainInternal } from '../src/Chain';
+import { Chain, ChainConnectionFailed, ChainNotConnected } from '../src/Chain';
 import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-provider';
 
 use(chaiAsPromised);
@@ -25,7 +25,7 @@ describe('Chain', function() {
                 });
 
                 afterEach(function() {
-                    ChainInternal.disconnect();
+                    Chain.disconnect();
                 });
 
                 it('should provide Chain instance', async function() {
@@ -57,7 +57,7 @@ describe('Chain', function() {
                 });
 
                 afterEach(function() {
-                    ChainInternal.disconnect();
+                    Chain.disconnect();
                 });
 
                 it('should not fail', function() {
@@ -81,7 +81,7 @@ describe('Chain', function() {
         });
 
         afterEach(function() {
-            ChainInternal.disconnect();
+            Chain.disconnect();
         });
 
         it('should provide the correct chain id', function() {

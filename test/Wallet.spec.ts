@@ -1,11 +1,6 @@
-import { use, expect } from 'chai';
+import { use } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import { Chain, Orderbook, OrderbookDEX, Token, UserData, Wallet } from '../src';
-import { Cache } from '../src/Cache';
-import { ChainInternal } from '../src/Chain';
-import { OrderbookDEXInternal } from '../src/OrderbookDEX';
-import { UserDataInternal } from '../src/UserData';
-import { WalletInternal } from '../src/Wallet';
 import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-provider';
 import { resetIndexedDB } from './indexeddb';
 import { setUpSmartContracts } from './smart-contracts';
@@ -23,13 +18,12 @@ describe('Wallet', function() {
     });
 
     afterEach(async function() {
-        WalletInternal.disconnect();
-        UserDataInternal.unload();
-        OrderbookDEXInternal.disconnect();
-        ChainInternal.disconnect();
+        Wallet.disconnect();
+        UserData.unload();
+        OrderbookDEX.disconnect();
+        Chain.disconnect();
         await tearDownEthereumProvider();
         resetIndexedDB();
-        Cache.reset();
     });
 
     describe('register', function() {
@@ -41,7 +35,7 @@ describe('Wallet', function() {
     describe('connect', function() {
         beforeEach(async function() {
             await Wallet.register();
-            WalletInternal.disconnect();
+            Wallet.disconnect();
         });
 
         it('should connect', async function() {

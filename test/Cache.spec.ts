@@ -3,7 +3,7 @@ import chaiAsPromised from 'chai-as-promised';
 import addContext from 'mochawesome/addContext';
 import { Cache } from '../src/Cache';
 import { resetIndexedDB } from './indexeddb';
-import { Chain, ChainInternal } from '../src/Chain';
+import { Chain } from '../src/Chain';
 import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-provider';
 import { addPriceHistoryRangeScenarios } from './scenarios/addPriceHistoryRange';
 import { getPriceHistoryRangesScenarios } from './scenarios/getPriceHistoryRanges';
@@ -20,10 +20,9 @@ describe('Cache', function() {
     });
 
     afterEach(async function() {
-        ChainInternal.disconnect();
+        Chain.disconnect();
         await tearDownEthereumProvider();
         resetIndexedDB();
-        Cache.reset();
     });
 
     describe('getPriceHistoryRanges', function() {

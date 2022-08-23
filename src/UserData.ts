@@ -42,6 +42,13 @@ export abstract class UserData extends EventTarget {
     }
 
     /**
+     * Unload the user data.
+     */
+    static unload(): void {
+        UserDataInternal.unload();
+    }
+
+    /**
      * Get the orderbooks that the user has saved.
      *
      * @param abortSignal A signal to abort the operation.

@@ -2,13 +2,12 @@ import { use, expect } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import addContext from 'mochawesome/addContext';
 import { fetchOrderbook } from '../src/Orderbook';
-import { Chain, ChainInternal } from '../src/Chain';
+import { Chain } from '../src/Chain';
 import { fetchPriceHistoryBarAtBlock } from '../src/PriceHistory';
 import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-provider';
 import { resetIndexedDB } from './indexeddb';
 import { setUpSmartContracts, simulatePriceHistory } from './smart-contracts';
-import { OrderbookDEX, OrderbookDEXInternal } from '../src/OrderbookDEX';
-import { Cache } from '../src/Cache';
+import { OrderbookDEX } from '../src/OrderbookDEX';
 import { fetchPriceHistoryBarAtBlockScenarios } from './scenarios/fetchPriceHistoryBarAtBlock';
 import { TimeFrame } from '../src/PriceHistory';
 import { deepConvertBigIntToString } from './utils';
@@ -29,11 +28,10 @@ describe('fetchPriceHistoryBarAtBlock', function() {
     });
 
     afterEach(async function() {
-        OrderbookDEXInternal.disconnect();
-        ChainInternal.disconnect();
+        OrderbookDEX.disconnect();
+        Chain.disconnect();
         await tearDownEthereumProvider();
         resetIndexedDB();
-        Cache.reset();
     });
 
     for (const scenario of fetchPriceHistoryBarAtBlockScenarios) {

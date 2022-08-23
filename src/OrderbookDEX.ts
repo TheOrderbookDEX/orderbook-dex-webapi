@@ -36,6 +36,13 @@ export abstract class OrderbookDEX extends EventTarget {
     }
 
     /**
+     * Disconnect from The Orderbook DEX.
+     */
+    static disconnect(): void {
+        OrderbookDEXInternal.disconnect();
+    }
+
+    /**
      * Get an ERC20 token.
      *
      * @param address the address of the token

@@ -2,13 +2,12 @@ import { use, expect } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import addContext from 'mochawesome/addContext';
 import { fetchOrderbook } from '../src/Orderbook';
-import { Chain, ChainInternal } from '../src/Chain';
+import { Chain } from '../src/Chain';
 import { fetchLast24hsPriceHistoryTicks, PriceHistoryTickInternal } from '../src/PriceHistory';
 import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-provider';
 import { resetIndexedDB } from './indexeddb';
 import { setUpSmartContracts, simulateTicks } from './smart-contracts';
-import { OrderbookDEX, OrderbookDEXInternal } from '../src/OrderbookDEX';
-import { Cache } from '../src/Cache';
+import { OrderbookDEX } from '../src/OrderbookDEX';
 import { fetchLast24hsPriceHistoryTicksScenarios } from './scenarios/fetchLast24hsPriceHistoryTicks';
 import { getBlockNumber } from '@theorderbookdex/abi2ts-lib';
 import { Address } from '../src/Address';
@@ -26,11 +25,10 @@ describe('fetchLast24hsPriceHistoryTicks', function() {
     });
 
     afterEach(async function() {
-        OrderbookDEXInternal.disconnect();
-        ChainInternal.disconnect();
+        OrderbookDEX.disconnect();
+        Chain.disconnect();
         await tearDownEthereumProvider();
         resetIndexedDB();
-        Cache.reset();
     });
 
     for (const scenario of fetchLast24hsPriceHistoryTicksScenarios) {
