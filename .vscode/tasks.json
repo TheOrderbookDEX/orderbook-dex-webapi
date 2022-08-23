@@ -23,6 +23,12 @@
 				"kind": "test",
 				"isDefault": true
 			}
+		},
+		{
+			"label": "Lint",
+			"type": "npm",
+			"script": "lint",
+			"problemMatcher": "$eslint-stylish"
 		}
 	]
 }

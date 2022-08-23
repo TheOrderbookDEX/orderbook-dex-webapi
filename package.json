@@ -8,7 +8,8 @@
   "repository": "https://github.com/TheOrderbookDEX/orderbook-dex-webapi.git",
   "scripts": {
     "prepare": "gulp",
-    "test": "mocha"
+    "test": "mocha",
+    "lint": "eslint . --ext .ts"
   },
   "dependencies": {
     "@theorderbookdex/abi2ts-lib": "~0.2.0",
