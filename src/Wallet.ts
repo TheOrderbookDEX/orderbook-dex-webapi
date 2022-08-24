@@ -150,6 +150,14 @@ export abstract class Wallet extends EventTarget {
     abstract openOrders(abortSignal?: AbortSignal): AsyncIterable<Order>;
 
     /**
+     * Get the closed orders of the user.
+     *
+     * @param abortSignal A signal to abort the operation.
+     * @returns The closed orders.
+     */
+    abstract closedOrders(abortSignal?: AbortSignal): AsyncIterable<Order>;
+
+    /**
      * Execute a buy at market operation.
      *
      * @param orderbook     The orderbook.
@@ -610,6 +618,15 @@ export class WalletInternal extends Wallet {
 
     async * openOrders(abortSignal?: AbortSignal) {
         for (const cachedOrder of await Cache.instance.getOpenOrders(this._operator, abortSignal)) {
+            yield {
+                ...cachedOrder,
+                orderbook: await fetchOrderbook(cachedOrder.orderbook, abortSignal),
+            };
+        }
+    }
+
+    async * closedOrders(abortSignal?: AbortSignal) {
+        for (const cachedOrder of await Cache.instance.getClosedOrders(this._operator, abortSignal)) {
             yield {
                 ...cachedOrder,
                 orderbook: await fetchOrderbook(cachedOrder.orderbook, abortSignal),

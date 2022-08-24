@@ -192,6 +192,13 @@ export class Cache {
         return orders.reverse();
     }
 
+    async getClosedOrders(owner: Address, abortSignal?: AbortSignal) {
+        const range = IDBKeyRange.bound([owner, CachedOrderMainStatus.CLOSED, -Infinity], [owner, CachedOrderMainStatus.CLOSED, Infinity]);
+        const orders = await this._db.getAllFromIndex('orders', 'byMainStatus', range);
+        checkAbortSignal(abortSignal);
+        return orders.reverse();
+    }
+
     async saveOrder(order: Omit<CachedOrder, 'mainStatus'>, abortSignal?: AbortSignal) {
         const {
             key,
