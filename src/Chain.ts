@@ -65,7 +65,7 @@ export class ChainInternal extends Chain {
             ethereum.on('chainChanged', () => {
                 location.reload();
             });
-            await Cache.load();
+            await Cache.load(chainId);
             await ChainEvents.start();
         }
         return this._instance;
@@ -118,7 +118,6 @@ export async function fetchBlockTimestamp(blockNumber: number, abortSignal?: Abo
  * Error thrown when connection to blockchain failed.
  */
 export class ChainConnectionFailed extends Error {
-    /** @internal */
     constructor() {
         super('Chain Connection Failed');
         this.name = 'ChainConnectionFailed';
@@ -130,7 +129,6 @@ export class ChainConnectionFailed extends Error {
  * connected.
  */
 export class ChainNotConnected extends Error {
-    /** @internal */
     constructor() {
         super('Chain Not Connected');
         this.name = 'ChainNotConnected';

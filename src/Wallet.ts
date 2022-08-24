@@ -5,7 +5,7 @@ import { OrderbookDEXInternal } from './OrderbookDEX';
 import { IOperatorFactory } from '@theorderbookdex/orderbook-dex-operator/dist/interfaces/IOperatorFactory';
 import { getDevChainFunds } from './dev-chain';
 import { isProviderRpcError, USER_REJECTED_REQUEST } from './ethereum';
-import { Orderbook } from './Orderbook';
+import { fetchOrderbook, Orderbook } from './Orderbook';
 import { checkAbortSignal, createSubAbortController, max, min } from './utils';
 import { abidecode, abiencode, ContractEvent, decodeErrorData, MAX_UINT32, Transaction } from '@theorderbookdex/abi2ts-lib';
 import { BoughtAtMarket, Failed, IOperator, OrderCanceled, OrderClaimed, PlacedBuyOrder, PlacedSellOrder, SoldAtMarket } from '@theorderbookdex/orderbook-dex-operator/dist/interfaces/IOperator';
@@ -142,6 +142,14 @@ export abstract class Wallet extends EventTarget {
     abstract orders(abortSignal?: AbortSignal): AsyncIterable<Order>;
 
     /**
+     * Get the open orders of the user.
+     *
+     * @param abortSignal A signal to abort the operation.
+     * @returns The open orders.
+     */
+    abstract openOrders(abortSignal?: AbortSignal): AsyncIterable<Order>;
+
+    /**
      * Execute a buy at market operation.
      *
      * @param orderbook     The orderbook.
@@ -231,7 +239,6 @@ export abstract class Wallet extends EventTarget {
         super.removeEventListener(type, callback, options);
     }
 
-    /** @internal */
     dispatchEvent(event: WalletEvent): boolean {
         return super.dispatchEvent(event);
     }
@@ -346,7 +353,7 @@ export class WalletInternal extends Wallet {
     ) {
         super();
         void (async () => {
-            for await (const order of Cache.instance.getOpenOrders(_operator, this.abortController.signal)) {
+            for await (const order of this.openOrders(this.abortController.signal)) {
                 this.trackOrder(order);
             }
         })();
@@ -592,8 +599,22 @@ export class WalletInternal extends Wallet {
         await this.saveOrder(order, abortSignal);
     }
 
-    orders(abortSignal?: AbortSignal): AsyncIterable<Order> {
-        return Cache.instance.getOrders(this._operator, abortSignal);
+    async * orders(abortSignal?: AbortSignal) {
+        for (const cachedOrder of await Cache.instance.getOrders(this._operator, abortSignal)) {
+            yield {
+                ...cachedOrder,
+                orderbook: await fetchOrderbook(cachedOrder.orderbook, abortSignal),
+            };
+        }
+    }
+
+    async * openOrders(abortSignal?: AbortSignal) {
+        for (const cachedOrder of await Cache.instance.getOpenOrders(this._operator, abortSignal)) {
+            yield {
+                ...cachedOrder,
+                orderbook: await fetchOrderbook(cachedOrder.orderbook, abortSignal),
+            };
+        }
     }
 
     private async createOrder(txHash: string, orderbook: Orderbook, type: OrderType, execution: OrderExecutionType, price: bigint, amount: bigint) {
@@ -618,19 +639,23 @@ export class WalletInternal extends Wallet {
             claimTxHash: '',
             cancelTxHash: '',
         });
-        await Cache.instance.saveOrder(order);
+        await Cache.instance.saveOrder({ ...order, orderbook: order.orderbook.address });
         this.dispatchEvent(new OrderCreatedEvent(order));
         this.trackOrder(order);
     }
 
     private async saveOrder(order: OrderInternal, abortSignal?: AbortSignal) {
         order = updateOrderStatus(order);
-        await Cache.instance.saveOrder(order, abortSignal);
+        await Cache.instance.saveOrder({ ...order, orderbook: order.orderbook.address }, abortSignal);
         this.dispatchEvent(new OrderUpdatedEvent(order));
     }
 
     private async refreshOrder(order: OrderInternal, abortSignal?: AbortSignal) {
-        return await Cache.instance.getOrder(order.key, abortSignal);
+        const cachedOrder = await Cache.instance.getOrder(order.key, abortSignal);
+        return {
+            ...cachedOrder,
+            orderbook: await fetchOrderbook(cachedOrder.orderbook),
+        };
     }
 
     async buyAtMarket(orderbook: Orderbook, maxAmount: bigint, maxPrice: bigint, abortSignal?: AbortSignal) {
@@ -784,7 +809,7 @@ export class WalletInternal extends Wallet {
         if (!order.status.includes(OrderStatus.CLOSED)) {
             throw new CannotDismissOrder();
         }
-        await Cache.instance.deleteOrder(order, abortSignal);
+        await Cache.instance.deleteOrder(order.key, abortSignal);
         this.dispatchEvent(new OrderRemovedEvent(order));
     }
 }

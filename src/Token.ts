@@ -55,7 +55,6 @@ export class Token {
         return parseValue(amount, this.decimals);
     }
 
-    /** @internal */
     constructor({
         address,
         name,
@@ -79,7 +78,7 @@ interface TokenProperties {
 export async function fetchToken(address: Address, abortSignal?: AbortSignal): Promise<Token> {
     checkAbortSignal(abortSignal);
     try {
-        return await Cache.instance.getToken(address, abortSignal);
+        return new Token(await Cache.instance.getToken(address, abortSignal));
     } catch {
         const contract = IERC20.at(address);
         const name = await asyncCatchError(contract.name(), NotAnERC20Token);
@@ -88,7 +87,9 @@ export async function fetchToken(address: Address, abortSignal?: AbortSignal): P
         checkAbortSignal(abortSignal);
         const decimals = await asyncCatchError(contract.decimals(), NotAnERC20Token);
         checkAbortSignal(abortSignal);
-        return await Cache.instance.saveToken(new Token({ address, name, symbol, decimals }), abortSignal);
+        const token = new Token({ address, name, symbol, decimals });
+        await Cache.instance.saveToken(token, abortSignal);
+        return token;
     }
 }
 
@@ -96,7 +97,6 @@ export async function fetchToken(address: Address, abortSignal?: AbortSignal): P
  * Error thrown when a given address fails to conform to the ERC20 token standard.
  */
 export class NotAnERC20Token extends Error {
-    /** @internal */
     constructor() {
         super('Not An ERC20 Token');
         this.name = 'NotAnERC20Token';

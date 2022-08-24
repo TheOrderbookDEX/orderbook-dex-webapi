@@ -252,7 +252,8 @@ export function listenToPriceHistoryTicks(orderbook: Address, abortSignal: Abort
                         fromBlock = blockNumber;
                     }
                     const timestamp = await fetchBlockTimestamp(blockNumber, abortSignal);
-                    listener(await Cache.instance.savePriceHistoryTick({ orderbook, blockNumber, logIndex, price, timestamp }, abortSignal));
+                    await Cache.instance.savePriceHistoryTick({ orderbook, blockNumber, logIndex, price, timestamp }, abortSignal);
+                    listener({ orderbook, blockNumber, logIndex, price, timestamp });
                 } catch (error) {
                     if (!isAbortReason(abortSignal, error)) {
                         throw error;
@@ -385,7 +386,6 @@ export class HistoryBarAddedEvent extends PriceHistoryEvent {
      */
     readonly bar: PriceHistoryBar;
 
-    /** @internal */
     constructor(bar: PriceHistoryBar) {
         super(PriceHistoryEventType.HISTORY_BAR_ADDED);
         this.bar = bar;
@@ -401,7 +401,6 @@ export class HistoryBarUpdatedEvent extends PriceHistoryEvent {
      */
     readonly bar: PriceHistoryBar;
 
-    /** @internal */
     constructor(bar: PriceHistoryBar) {
         super(PriceHistoryEventType.HISTORY_BAR_UPDATED);
         this.bar = bar;

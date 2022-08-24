@@ -1,41 +1,47 @@
 import { DBSchema, IDBPDatabase, IDBPTransaction, openDB } from 'idb';
 import { Address } from './Address';
-import { Chain } from './Chain';
-import { OrderInternal, OrderExecutionType, OrderStatus, OrderType } from './Order';
-import { OrderbookInternal } from './Orderbook';
-import { PriceHistoryTickInternal } from './PriceHistory';
-import { Token } from './Token';
+import { OrderExecutionType, OrderStatus, OrderType } from './Order';
 import { checkAbortSignal } from './utils';
 
 export class Cache {
     private static _instance?: Cache;
 
-    static async load() {
+    static async load(chainId: number, version?: number) {
         if (!this._instance) {
-            const chainId = Chain.instance.chainId;
-            const db = await openDB<CacheV1>(`Cache${chainId}`, 1, {
-                async upgrade(db, version) {
-                    if (version < 1) {
-                        db.createObjectStore('blocks', {
+            if (!version || version > 2) version = 2;
+            const db = await openDB<CacheV2>(`Cache${chainId}`, version, {
+                async upgrade(db, oldVersion, newVersion: number, tx) {
+                    if (oldVersion < 1 && newVersion >= 1) {
+                        const v1db = db as unknown as IDBPDatabase<CacheV1>;
+                        v1db.createObjectStore('blocks', {
                             keyPath: 'blockNumber',
                         });
-                        db.createObjectStore('tokens', {
+                        v1db.createObjectStore('tokens', {
                             keyPath: 'address',
                         });
-                        db.createObjectStore('orderbooks', {
+                        v1db.createObjectStore('orderbooks', {
                             keyPath: 'address',
                         });
-                        db.createObjectStore('priceHistoryRanges', {
+                        v1db.createObjectStore('priceHistoryRanges', {
                             keyPath: ['orderbook', 'toBlock'],
                         });
-                        db.createObjectStore('priceHistoryTicks', {
+                        v1db.createObjectStore('priceHistoryTicks', {
                             keyPath: ['orderbook', 'blockNumber', 'logIndex'],
                         });
-                        const orders = db.createObjectStore('orders', {
+                        const orders = v1db.createObjectStore('orders', {
                             keyPath: 'key',
                         });
                         orders.createIndex('byOwner', ['owner', 'timestamp'], { unique: false });
-                        orders.createIndex('byMainStatus', ['owner', 'mainStatus'], { unique: false });
+                        if (newVersion == 1) {
+                            orders.createIndex('byMainStatus', ['owner', 'mainStatus'], { unique: false });
+                        }
+                    }
+                    if (oldVersion < 2 && newVersion >= 2) {
+                        const orders = tx.objectStore('orders');
+                        if (oldVersion == 1) {
+                            orders.deleteIndex('byMainStatus');
+                        }
+                        orders.createIndex('byMainStatus', ['owner', 'mainStatus', 'timestamp'], { unique: false });
                     }
                 }
             });
@@ -51,10 +57,13 @@ export class Cache {
     }
 
     static unload() {
-        delete this._instance;
+        if (this._instance) {
+            this._instance._db.close();
+            delete this._instance;
+        }
     }
 
-    constructor(private readonly _db: IDBPDatabase<CacheV1>) {}
+    constructor(private readonly _db: IDBPDatabase<CacheV2>) {}
 
     async getBlockTimestamp(blockNumber: number, abortSignal?: AbortSignal) {
         checkAbortSignal(abortSignal);
@@ -75,14 +84,13 @@ export class Cache {
         const token = await this._db.get('tokens', address);
         checkAbortSignal(abortSignal);
         if (!token) throw new CacheMiss;
-        return new Token(token);
+        return token;
     }
 
-    async saveToken(token: Token, abortSignal?: AbortSignal) {
+    async saveToken(token: CachedToken, abortSignal?: AbortSignal) {
         const { address, name, symbol, decimals } = token;
         await this._db.put('tokens', { address, name, symbol, decimals });
         checkAbortSignal(abortSignal);
-        return token;
     }
 
     async getOrderbook(address: Address, abortSignal?: AbortSignal) {
@@ -90,20 +98,18 @@ export class Cache {
         const orderbook = await this._db.get('orderbooks', address);
         checkAbortSignal(abortSignal);
         if (!orderbook) throw new CacheMiss;
-        const tradedToken = await this.getToken(orderbook.tradedToken, abortSignal);
-        const baseToken = await this.getToken(orderbook.baseToken, abortSignal);
-        return new OrderbookInternal({ ...orderbook, tradedToken, baseToken });
+        return orderbook;
     }
 
-    async saveOrderbook(orderbook: OrderbookInternal, abortSignal?: AbortSignal) {
+    async saveOrderbook(orderbook: CachedOrderbook, abortSignal?: AbortSignal) {
         const {
             address,
             version,
             contractSize,
             priceTick,
             creationBlockNumber,
-            tradedToken: { address: tradedToken },
-            baseToken: { address: baseToken },
+            tradedToken,
+            baseToken,
         } = orderbook;
         await this._db.put('orderbooks', {
             address,
@@ -115,11 +121,10 @@ export class Cache {
             creationBlockNumber,
         });
         checkAbortSignal(abortSignal);
-        return orderbook;
     }
 
     private async _getPriceHistoryRanges(
-        tx: IDBPTransaction<CacheV1, ['priceHistoryRanges'], 'readonly' | 'readwrite'>,
+        tx: IDBPTransaction<CacheV2, ['priceHistoryRanges'], 'readonly' | 'readwrite'>,
         orderbook: Address, fromBlock: number, toBlock: number
     ) {
         const keyRange = IDBKeyRange.bound([orderbook, fromBlock], [orderbook, toBlock]);
@@ -161,46 +166,38 @@ export class Cache {
         return ticks;
     }
 
-    async savePriceHistoryTick(tick: PriceHistoryTickInternal, abortSignal?: AbortSignal) {
+    async savePriceHistoryTick(tick: CachedPriceHistoryTick, abortSignal?: AbortSignal) {
         await this._db.put('priceHistoryTicks', tick);
         checkAbortSignal(abortSignal);
-        return tick;
     }
 
-    async * getOrders(owner: Address, abortSignal?: AbortSignal): AsyncIterable<OrderInternal> {
-        const range = IDBKeyRange.bound([owner, 0], [owner, Infinity]);
+    async getOrders(owner: Address, abortSignal?: AbortSignal) {
+        const range = IDBKeyRange.bound([owner, -Infinity], [owner, Infinity]);
         const orders = await this._db.getAllFromIndex('orders', 'byOwner', range);
         checkAbortSignal(abortSignal);
-        for (const order of orders.reverse()) {
-            const orderbook = await this.getOrderbook(order.orderbook, abortSignal);
-            yield { ...order, orderbook };
-        }
+        return orders.reverse();
     }
 
-    async getOrder(key: string, abortSignal?: AbortSignal): Promise<OrderInternal> {
+    async getOrder(key: string, abortSignal?: AbortSignal) {
         const order = await this._db.get('orders', key);
         checkAbortSignal(abortSignal);
         if (!order) throw new CacheMiss;
-        const orderbook = await this.getOrderbook(order.orderbook, abortSignal);
-        checkAbortSignal(abortSignal);
-        return { ...order, orderbook };
+        return order;
     }
 
-    async * getOpenOrders(owner: Address, abortSignal?: AbortSignal): AsyncIterable<OrderInternal> {
-        const orders = await this._db.getAllFromIndex('orders', 'byMainStatus', [owner, Status.OPEN]);
+    async getOpenOrders(owner: Address, abortSignal?: AbortSignal) {
+        const range = IDBKeyRange.bound([owner, CachedOrderMainStatus.OPEN, -Infinity], [owner, CachedOrderMainStatus.OPEN, Infinity]);
+        const orders = await this._db.getAllFromIndex('orders', 'byMainStatus', range);
         checkAbortSignal(abortSignal);
-        for (const order of orders.reverse()) {
-            const orderbook = await this.getOrderbook(order.orderbook, abortSignal);
-            yield { ...order, orderbook };
-        }
+        return orders.reverse();
     }
 
-    async saveOrder(order: OrderInternal, abortSignal?: AbortSignal) {
+    async saveOrder(order: Omit<CachedOrder, 'mainStatus'>, abortSignal?: AbortSignal) {
         const {
             key,
             owner,
             timestamp,
-            orderbook: { address: orderbook },
+            orderbook,
             txHash,
             id,
             status,
@@ -218,9 +215,9 @@ export class Cache {
             cancelTxHash,
         } = order;
         const mainStatus =
-              status.includes(OrderStatus.PENDING) ? Status.OPEN
-            : status.includes(OrderStatus.OPEN) ? Status.OPEN
-            : Status.CLOSED;
+              status.includes(OrderStatus.PENDING) ? CachedOrderMainStatus.OPEN
+            : status.includes(OrderStatus.OPEN) ? CachedOrderMainStatus.OPEN
+            : CachedOrderMainStatus.CLOSED;
         await this._db.put('orders', {
             key,
             owner,
@@ -244,11 +241,10 @@ export class Cache {
             cancelTxHash,
         });
         checkAbortSignal(abortSignal);
-        return order;
     }
 
-    async deleteOrder(order: OrderInternal, abortSignal?: AbortSignal) {
-        await this._db.delete('orders', order.key);
+    async deleteOrder(key: CachedOrder['key'], abortSignal?: AbortSignal) {
+        await this._db.delete('orders', key);
         checkAbortSignal(abortSignal);
     }
 }
@@ -260,79 +256,133 @@ export class CacheMiss extends Error {
     }
 }
 
-enum Status {
+export interface CachedBlock {
+    blockNumber: number;
+    timestamp: number;
+}
+
+export interface CachedToken {
+    address: Address;
+    name: string;
+    symbol: string;
+    decimals: number;
+}
+
+export interface CachedOrderbook {
+    address: Address;
+    version: bigint;
+    tradedToken: Address;
+    baseToken: Address;
+    contractSize: bigint;
+    priceTick: bigint;
+    creationBlockNumber: number;
+}
+
+export interface CachedPriceHistoryRange {
+    orderbook: Address;
+    fromBlock: number;
+    toBlock: number;
+}
+
+export interface CachedPriceHistoryTick {
+    readonly orderbook: string;
+    readonly blockNumber: number;
+    readonly logIndex: number;
+    readonly timestamp: number;
+    readonly price: bigint;
+}
+
+export enum CachedOrderMainStatus {
     OPEN,
     CLOSED,
 }
 
+export interface CachedOrder {
+    key: string;
+    owner: Address;
+    timestamp: number;
+    orderbook: Address;
+    txHash: string;
+    id: string;
+    mainStatus: CachedOrderMainStatus;
+    status: readonly OrderStatus[];
+    type: OrderType;
+    execution: OrderExecutionType;
+    price: bigint;
+    totalPrice: bigint;
+    totalPriceClaimed: bigint;
+    amount: bigint;
+    filled: bigint;
+    claimed: bigint;
+    canceled: bigint;
+    error: string;
+    claimTxHash: string;
+    cancelTxHash: string;
+}
+
 interface CacheV1 extends DBSchema {
     blocks: {
-        key: number;
-        value: {
-            blockNumber: number;
-            timestamp: number;
-        };
+        key: CachedBlock['blockNumber'];
+        value: CachedBlock;
     },
     tokens: {
-        key: Address;
-        value: {
-            address: Address;
-            name: string;
-            symbol: string;
-            decimals: number;
-        };
+        key: CachedToken['address'];
+        value: CachedToken;
     },
     orderbooks: {
-        key: Address;
-        value: {
-            address: Address;
-            version: bigint;
-            tradedToken: Address;
-            baseToken: Address;
-            contractSize: bigint;
-            priceTick: bigint;
-            creationBlockNumber: number;
-        };
+        key: CachedOrderbook['address'];
+        value: CachedOrderbook;
     },
     priceHistoryRanges: {
-        key: [Address, number];
-        value: {
-            orderbook: Address;
-            fromBlock: number;
-            toBlock: number;
-        };
+        key: [
+            CachedPriceHistoryRange['orderbook'],
+            CachedPriceHistoryRange['toBlock'],
+        ];
+        value: CachedPriceHistoryRange;
     },
     priceHistoryTicks: {
-        key: [Address, number, number];
-        value: PriceHistoryTickInternal;
+        key: [
+            CachedPriceHistoryTick['orderbook'],
+            CachedPriceHistoryTick['blockNumber'],
+            CachedPriceHistoryTick['logIndex'],
+        ];
+        value: CachedPriceHistoryTick;
     },
     orders: {
-        key: string;
-        value: {
-            key: string;
-            owner: Address;
-            timestamp: number;
-            orderbook: Address;
-            txHash: string;
-            id: string;
-            mainStatus: Status;
-            status: readonly OrderStatus[];
-            type: OrderType;
-            execution: OrderExecutionType;
-            price: bigint;
-            totalPrice: bigint;
-            totalPriceClaimed: bigint;
-            amount: bigint;
-            filled: bigint;
-            claimed: bigint;
-            canceled: bigint;
-            error: string;
-            claimTxHash: string;
-            cancelTxHash: string;
-        };
+        key: CachedOrder['key'];
+        value: CachedOrder;
         indexes: {
-            byOwner: [Address, number];
-            byMainStatus: [Address, Status];
+            byOwner: [
+                CachedOrder['owner'],
+                CachedOrder['timestamp'],
+            ];
+            byMainStatus: [
+                CachedOrder['owner'],
+                CachedOrder['mainStatus'],
+            ];
+        };
+    },
+}
+
+interface CacheV2 extends DBSchema {
+    blocks: CacheV1['blocks'],
+    tokens: CacheV1['tokens'],
+    orderbooks: CacheV1['orderbooks'],
+    priceHistoryRanges: CacheV1['priceHistoryRanges'],
+    priceHistoryTicks: CacheV1['priceHistoryTicks'],
+    orders: {
+        key: CachedOrder['key'];
+        value: CachedOrder;
+        indexes: {
+            byOwner: [
+                CachedOrder['owner'],
+                CachedOrder['timestamp'],
+            ];
+            byMainStatus: [
+                CachedOrder['owner'],
+                CachedOrder['mainStatus'],
+                CachedOrder['timestamp'],
+            ];
         };
     },
 }

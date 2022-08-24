@@ -158,7 +158,7 @@ describe('Wallet', function() {
 
 async function waitForOrdersPendingTransactions() {
     const pending: Promise<Transaction>[] = [];
-    for await (const order of Cache.instance.getOpenOrders(WalletInternal.instance._operator)) {
+    for (const order of await Cache.instance.getOpenOrders(WalletInternal.instance._operator)) {
         if (order.txHash) {
             pending.push(Transaction.get(order.txHash));
         }

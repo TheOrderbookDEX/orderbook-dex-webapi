@@ -126,7 +126,12 @@ interface OrderbookProperties {
 export async function fetchOrderbook(address: Address, abortSignal?: AbortSignal): Promise<Orderbook> {
     checkAbortSignal(abortSignal);
     try {
-        return await Cache.instance.getOrderbook(address, abortSignal);
+        const cachedOrderbook = await Cache.instance.getOrderbook(address, abortSignal);
+        return new OrderbookInternal({
+            ...cachedOrderbook,
+            tradedToken: await fetchToken(cachedOrderbook.tradedToken, abortSignal),
+            baseToken: await fetchToken(cachedOrderbook.baseToken, abortSignal),
+        });
     } catch {
         const contract = IOrderbook.at(address);
         const version = await asyncCatchError(contract.version(), NotAnOrderbook);
@@ -145,9 +150,10 @@ export async function fetchOrderbook(address: Address, abortSignal?: AbortSignal
                 const orderbookFactory = IOrderbookFactoryV1.at(OrderbookDEXInternal.instance._config.orderbookFactoryV1);
                 const creationBlockNumber = Number(await asyncCatchError(orderbookFactory.blockNumber(address), NotAnOrderbook));
                 checkAbortSignal(abortSignal);
-                return await Cache.instance.saveOrderbook(new OrderbookInternal({
-                    address, version, tradedToken, baseToken, contractSize, priceTick, creationBlockNumber
-                }), abortSignal);
+                await Cache.instance.saveOrderbook({
+                    address, version, tradedToken: tradedToken.address, baseToken: baseToken.address, contractSize, priceTick, creationBlockNumber
+                }, abortSignal);
+                return new OrderbookInternal({ address, version, tradedToken, baseToken, contractSize, priceTick, creationBlockNumber });
             }
             default: {
                 throw new UnsupportedOrderbookVersion;
@@ -160,7 +166,6 @@ export async function fetchOrderbook(address: Address, abortSignal?: AbortSignal
  * Error thrown when a given address fails to conform to the orderbook interface.
  */
 export class NotAnOrderbook extends Error {
-    /** @internal */
     constructor() {
         super('Not An Orderbook');
         this.name = 'NotAnOrderbook';
@@ -171,7 +176,6 @@ export class NotAnOrderbook extends Error {
  * Error thrown when trying to use an orderbook version not supported by the api.
  */
 export class UnsupportedOrderbookVersion extends Error {
-    /** @internal */
     constructor() {
         super('Unsupported Orderbook Version');
         this.name = 'UnsupportedOrderbookVersion';
