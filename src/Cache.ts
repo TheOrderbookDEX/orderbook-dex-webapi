@@ -178,6 +178,19 @@ export class Cache {
         return orders.reverse();
     }
 
+    async getRecentOrders(owner: Address, count: number, abortSignal?: AbortSignal) {
+        const range = IDBKeyRange.bound([owner, -Infinity], [owner, Infinity]);
+        let cursor = await this._db.transaction('orders').store.index('byOwner').openCursor(range, 'prev');
+        const orders: CachedOrder[] = [];
+        while (cursor && count > 0) {
+            orders.push(cursor.value);
+            cursor = await cursor.continue();
+            count--;
+        }
+        checkAbortSignal(abortSignal);
+        return orders;
+    }
+
     async getOrder(key: string, abortSignal?: AbortSignal) {
         const order = await this._db.get('orders', key);
         checkAbortSignal(abortSignal);
