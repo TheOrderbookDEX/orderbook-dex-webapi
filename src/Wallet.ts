@@ -35,6 +35,11 @@ export enum WalletEventType {
     ORDER_UPDATED = 'orderUpdated',
 
     /**
+     * Event type dispatched when an order is removed.
+     */
+    ORDER_REMOVED = 'orderRemoved',
+
+    /**
      * Event type dispatched when tokens have been deposited into the operator.
      */
     TOKEN_DEPOSITED = 'tokenDeposited',
@@ -198,8 +203,19 @@ export abstract class Wallet extends EventTarget {
      */
     abstract cancelOrder(order: Order, abortSignal?: AbortSignal): Promise<void>;
 
+    /**
+     * Dismiss a closed order.
+     *
+     * @param order       The order.
+     * @param abortSignal A signal to abort.
+     *
+     * @throws {CannotDismissOrder} When the order is not closed.
+     */
+    abstract dismissOrder(order: Order, abortSignal?: AbortSignal): Promise<void>;
+
     addEventListener(type: WalletEventType.ORDER_CREATED, callback: GenericEventListener<OrderCreatedEvent> | null, options?: boolean | AddEventListenerOptions): void;
     addEventListener(type: WalletEventType.ORDER_UPDATED, callback: GenericEventListener<OrderUpdatedEvent> | null, options?: boolean | AddEventListenerOptions): void;
+    addEventListener(type: WalletEventType.ORDER_REMOVED, callback: GenericEventListener<OrderRemovedEvent> | null, options?: boolean | AddEventListenerOptions): void;
     addEventListener(type: WalletEventType.TOKEN_DEPOSITED, callback: GenericEventListener<TokenDepositedEvent> | null, options?: boolean | AddEventListenerOptions): void;
     addEventListener(type: WalletEventType.TOKEN_WITHDRAWN, callback: GenericEventListener<TokenWithdrawnEvent> | null, options?: boolean | AddEventListenerOptions): void;
     addEventListener(type: WalletEventType, callback: GenericEventListener<WalletEvent> | null, options?: boolean | AddEventListenerOptions): void {
@@ -208,6 +224,7 @@ export abstract class Wallet extends EventTarget {
 
     removeEventListener(type: WalletEventType.ORDER_CREATED, callback: GenericEventListener<OrderCreatedEvent> | null, options?: boolean | AddEventListenerOptions): void;
     removeEventListener(type: WalletEventType.ORDER_UPDATED, callback: GenericEventListener<OrderUpdatedEvent> | null, options?: boolean | AddEventListenerOptions): void;
+    removeEventListener(type: WalletEventType.ORDER_REMOVED, callback: GenericEventListener<OrderRemovedEvent> | null, options?: boolean | AddEventListenerOptions): void;
     removeEventListener(type: WalletEventType.TOKEN_DEPOSITED, callback: GenericEventListener<TokenDepositedEvent> | null, options?: boolean | AddEventListenerOptions): void;
     removeEventListener(type: WalletEventType.TOKEN_WITHDRAWN, callback: GenericEventListener<TokenWithdrawnEvent> | null, options?: boolean | AddEventListenerOptions): void;
     removeEventListener(type: WalletEventType, callback: GenericEventListener<WalletEvent> | null, options?: boolean | EventListenerOptions): void {
@@ -762,6 +779,14 @@ export class WalletInternal extends Wallet {
         }
         checkAbortSignal(abortSignal);
     }
+
+    async dismissOrder(order: OrderInternal, abortSignal?: AbortSignal): Promise<void> {
+        if (!order.status.includes(OrderStatus.CLOSED)) {
+            throw new CannotDismissOrder();
+        }
+        await Cache.instance.deleteOrder(order, abortSignal);
+        this.dispatchEvent(new OrderRemovedEvent(order));
+    }
 }
 
 function updateOrderStatus(order: OrderInternal): OrderInternal {
@@ -825,7 +850,6 @@ export abstract class WalletEvent extends Event {
  * Event dispatched when an order is created.
  */
 export class OrderCreatedEvent extends WalletEvent {
-    /** @internal */
     constructor(readonly order: Order) {
         super(WalletEventType.ORDER_CREATED);
     }
@@ -835,9 +859,17 @@ export class OrderCreatedEvent extends WalletEvent {
  * Event dispatched when an order is updated.
  */
 export class OrderUpdatedEvent extends WalletEvent {
-    /** @internal */
     constructor(readonly order: Order) {
         super(WalletEventType.ORDER_UPDATED);
+    }
+}
+
+/**
+ * Event dispatched when an order is removed.
+ */
+export class OrderRemovedEvent extends WalletEvent {
+    constructor(readonly order: Order) {
+        super(WalletEventType.ORDER_REMOVED);
     }
 }
 
@@ -845,7 +877,6 @@ export class OrderUpdatedEvent extends WalletEvent {
  * Event dispatched when tokens have been deposited into the operator.
  */
 export class TokenDepositedEvent extends WalletEvent {
-    /** @internal */
     constructor(readonly token: Token, readonly amount: bigint) {
         super(WalletEventType.TOKEN_DEPOSITED);
     }
@@ -855,7 +886,6 @@ export class TokenDepositedEvent extends WalletEvent {
  * Event dispatched when tokens have been withdrawn from the operator.
  */
 export class TokenWithdrawnEvent extends WalletEvent {
-    /** @internal */
     constructor(readonly token: Token, readonly amount: bigint) {
         super(WalletEventType.TOKEN_WITHDRAWN);
     }
@@ -865,7 +895,6 @@ export class TokenWithdrawnEvent extends WalletEvent {
  * Error thrown when the user needs to be asked for permission to connect to the wallet.
  */
 export class PermissionToWalletRequired extends Error {
-    /** @internal */
     constructor() {
         super('User Permission To Wallet Required');
         this.name = 'UserPermissionToWalletRequired';
@@ -876,7 +905,6 @@ export class PermissionToWalletRequired extends Error {
  * Error thrown when the user rejected the request to connect the wallet.
  */
 export class WalletConnectionRejected extends Error {
-    /** @internal */
     constructor() {
         super('Wallet Connection Rejected');
         this.name = 'WalletConnectionRejected';
@@ -888,7 +916,6 @@ export class WalletConnectionRejected extends Error {
  * connected.
  */
 export class WalletNotConnected extends Error {
-    /** @internal */
     constructor() {
         super('Wallet Not Connected');
         this.name = 'WalletNotConnected';
@@ -901,7 +928,6 @@ export class WalletNotConnected extends Error {
  * This probably means that the user has not generated their account.
  */
 export class WalletAddressNotFound extends Error {
-    /** @internal */
     constructor() {
         super('Wallet Address Not Found');
         this.name = 'WalletAddressNotFound';
@@ -912,7 +938,6 @@ export class WalletAddressNotFound extends Error {
  * Error thrown when the user needs to register.
  */
 export class RegisterRequired extends Error {
-    /** @internal */
     constructor() {
         super('Register Required');
         this.name = 'RegisterRequired';
@@ -923,7 +948,6 @@ export class RegisterRequired extends Error {
  * Error thrown when the user is already registered.
  */
 export class AlreadyRegistered extends Error {
-    /** @internal */
     constructor() {
         super('Already Registered');
         this.name = 'AlreadyRegistered';
@@ -934,7 +958,6 @@ export class AlreadyRegistered extends Error {
  * Error thrown when the user rejects the request to create the operator.
  */
 export class RegisterRejected extends Error {
-    /** @internal */
     constructor() {
         super('Register Rejected');
         this.name = 'RegisterRejected';
@@ -945,7 +968,6 @@ export class RegisterRejected extends Error {
  * Error thrown when the user rejected the request to execute an operation.
  */
 export class OperationRejected extends Error {
-    /** @internal */
     constructor() {
         super('Operation Rejected');
         this.name = 'OperationRejected';
@@ -956,9 +978,18 @@ export class OperationRejected extends Error {
  * Error thrown when there are not sufficient funds for an operation.
  */
 export class InsufficientFunds extends Error {
-    /** @internal */
     constructor() {
         super('Insufficient Funds');
         this.name = 'InsufficientFunds';
+    }
+}
+
+/**
+ * Error thrown when an order cannot be dismissed.
+ */
+export class CannotDismissOrder extends Error {
+    constructor() {
+        super('Cannot Dismiss Order');
+        this.name = 'CannotDismissOrder';
     }
 }

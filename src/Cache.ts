@@ -246,6 +246,11 @@ export class Cache {
         checkAbortSignal(abortSignal);
         return order;
     }
+
+    async deleteOrder(order: OrderInternal, abortSignal?: AbortSignal) {
+        await this._db.delete('orders', order.key);
+        checkAbortSignal(abortSignal);
+    }
 }
 
 export class CacheMiss extends Error {

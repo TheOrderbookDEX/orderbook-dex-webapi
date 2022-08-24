@@ -37,6 +37,10 @@ export function setTime(timestamp: number) {
     }
 }
 
+export function increaseTime(offset: number) {
+    setTime(currentTimestamp + offset);
+}
+
 export function setUpTimeMock() {
     changeTimeFunctionts(mockTimeFunctions);
     currentTimestamp = Math.floor(Date.now() / 1000);
