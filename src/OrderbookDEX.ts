@@ -183,6 +183,7 @@ chainConfigs[5] = {
     orderbookFactoryV1: '0xdFbd8e2360B96C0bd4A00d4D1271A33f0C6E75C7' as Address,
     orderbooks: [
         '0x24C2d6AA89b3DCC86a4d75cc85727136C5d5872f' as Address, // WBTC/USDC
+        '0xe705DB4Ae1d5E82f14e08B865448ab14498D36fD' as Address, // WETH/USDC
     ],
 };
 

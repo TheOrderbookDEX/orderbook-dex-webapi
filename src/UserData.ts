@@ -262,6 +262,7 @@ chainConfigs[5] = {
     ],
     orderbooks: [
         '0x24C2d6AA89b3DCC86a4d75cc85727136C5d5872f' as Address, // WBTC/USDC
+        '0xe705DB4Ae1d5E82f14e08B865448ab14498D36fD' as Address, // WETH/USDC
     ],
 };
 
