@@ -2,7 +2,7 @@ import { Ethereum, getEthereum } from './ethereum';
 import { checkAbortSignal } from './utils';
 import { Cache } from './Cache';
 import { ChainEvents } from './ChainEvents';
-import { getBlockTimestamp } from '@theorderbookdex/abi2ts-lib';
+import { getBlockTimestamp } from '@frugal-wizard/abi2ts-lib';
 
 /**
  * Connection to the blockchain.

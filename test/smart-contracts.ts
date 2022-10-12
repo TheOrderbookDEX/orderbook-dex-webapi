@@ -1,4 +1,4 @@
-import { AddressBook } from '@theorderbookdex/addressbook/dist/AddressBook';
+import { AddressBook } from '@frugal-wizard/addressbook/dist/AddressBook';
 import { ERC20Mock } from '@theorderbookdex/orderbook-dex/dist/testing/ERC20Mock';
 import { OperatorLogicRegistry } from '@theorderbookdex/orderbook-dex-operator/dist/OperatorLogicRegistry';
 import { OperatorFactory } from '@theorderbookdex/orderbook-dex-operator/dist/OperatorFactory';
@@ -6,7 +6,7 @@ import { OperatorLogicV1 } from '@theorderbookdex/orderbook-dex-v1/dist/Operator
 import { OrderbookFactoryV1 } from '@theorderbookdex/orderbook-dex-v1/dist/OrderbookFactoryV1';
 import { IOrderbookV1 } from '@theorderbookdex/orderbook-dex-v1/dist/interfaces/IOrderbookV1';
 import { IERC20 } from '@theorderbookdex/orderbook-dex/dist/interfaces/IERC20';
-import { createSigner, getAccounts, getBalance, getBlockTimestamp, hexstring, Signer } from '@theorderbookdex/abi2ts-lib';
+import { createSigner, getAccounts, getBalance, getBlockTimestamp, hexstring, Signer } from '@frugal-wizard/abi2ts-lib';
 import { EthereumProvider } from 'ganache';
 
 interface Global {

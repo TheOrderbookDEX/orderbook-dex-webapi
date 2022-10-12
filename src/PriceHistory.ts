@@ -5,7 +5,7 @@ import { EventTargetX } from './EventTargetX';
 import { checkAbortSignal, isAbortReason } from './utils';
 import { fetchOrderbook, OrderbookInternal } from './Orderbook';
 import { Cache } from './Cache';
-import { ContractEvent, getBlockNumber } from '@theorderbookdex/abi2ts-lib';
+import { ContractEvent, getBlockNumber } from '@frugal-wizard/abi2ts-lib';
 import { ChainEvents } from './ChainEvents';
 import { Address } from './Address';
 

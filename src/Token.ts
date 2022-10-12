@@ -1,4 +1,4 @@
-import { formatValue, parseValue } from '@theorderbookdex/abi2ts-lib';
+import { formatValue, parseValue } from '@frugal-wizard/abi2ts-lib';
 import { IERC20 } from '@theorderbookdex/orderbook-dex/dist/interfaces/IERC20';
 import { Address } from './Address';
 import { Cache } from './Cache';

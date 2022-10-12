@@ -10,7 +10,7 @@ import { setUpSmartContracts, simulateTicks } from './smart-contracts';
 import { OrderbookDEX } from '../src/OrderbookDEX';
 import { Cache } from '../src/Cache';
 import { fetchPriceHistoryTicksScenarios } from './scenarios/fetchPriceHistoryTicks';
-import { getBlockNumber } from '@theorderbookdex/abi2ts-lib';
+import { getBlockNumber } from '@frugal-wizard/abi2ts-lib';
 import { Address } from '../src/Address';
 
 use(chaiAsPromised);

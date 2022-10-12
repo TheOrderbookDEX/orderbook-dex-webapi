@@ -7,7 +7,7 @@ import { getDevChainFunds } from './dev-chain';
 import { isProviderRpcError, USER_REJECTED_REQUEST } from './ethereum';
 import { fetchOrderbook, Orderbook } from './Orderbook';
 import { checkAbortSignal, createSubAbortController, max, min } from './utils';
-import { abidecode, abiencode, ContractEvent, decodeErrorData, MAX_UINT32, Transaction } from '@theorderbookdex/abi2ts-lib';
+import { abidecode, abiencode, ContractEvent, decodeErrorData, MAX_UINT32, Transaction } from '@frugal-wizard/abi2ts-lib';
 import { BoughtAtMarket, Failed, IOperator, OrderCanceled, OrderClaimed, PlacedBuyOrder, PlacedSellOrder, SoldAtMarket } from '@theorderbookdex/orderbook-dex-operator/dist/interfaces/IOperator';
 import { IERC20 } from '@theorderbookdex/orderbook-dex/dist/interfaces/IERC20';
 import { Cache } from './Cache';

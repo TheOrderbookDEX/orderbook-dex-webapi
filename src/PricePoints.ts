@@ -1,4 +1,4 @@
-import { ContractEvent, getBlockNumber } from '@theorderbookdex/abi2ts-lib';
+import { ContractEvent, getBlockNumber } from '@frugal-wizard/abi2ts-lib';
 import { IOrderbookV1, Placed, Filled, Canceled } from '@theorderbookdex/orderbook-dex-v1/dist/interfaces/IOrderbookV1';
 import { Address } from './Address';
 import { ChainEvents } from './ChainEvents';

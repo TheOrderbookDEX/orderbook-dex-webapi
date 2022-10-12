@@ -1,4 +1,4 @@
-import { createSigner, getAccounts, getBalance, hexstring } from '@theorderbookdex/abi2ts-lib';
+import { createSigner, getAccounts, getBalance, hexstring } from '@frugal-wizard/abi2ts-lib';
 import { IERC20Mock } from '@theorderbookdex/orderbook-dex/dist/testing/interfaces/IERC20Mock';
 import { ChainInternal } from './Chain';
 

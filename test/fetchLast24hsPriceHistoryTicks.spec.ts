@@ -9,7 +9,7 @@ import { resetIndexedDB } from './indexeddb';
 import { setUpSmartContracts, simulateTicks } from './smart-contracts';
 import { OrderbookDEX } from '../src/OrderbookDEX';
 import { fetchLast24hsPriceHistoryTicksScenarios } from './scenarios/fetchLast24hsPriceHistoryTicks';
-import { getBlockNumber } from '@theorderbookdex/abi2ts-lib';
+import { getBlockNumber } from '@frugal-wizard/abi2ts-lib';
 import { Address } from '../src/Address';
 
 use(chaiAsPromised);
