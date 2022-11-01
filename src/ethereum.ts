@@ -12,14 +12,18 @@ export function getEthereum(): Ethereum | undefined {
     return 'ethereum' in globalThis ? (globalThis as any).ethereum as Ethereum : undefined;
 }
 
-export interface ProviderRpcError {
-    code: number;
+interface ObjectWithCodeProperty {
+    code: unknown;
 }
 
-export const USER_REJECTED_REQUEST = 4001;
+function isObjectWithCodeProperty(value: unknown): value is ObjectWithCodeProperty {
+    return value !== null && typeof value == 'object' && 'code' in value;
+}
 
-export function isProviderRpcError(error: unknown): error is ProviderRpcError {
-    return error instanceof Object
-        && 'code' in error
-        && typeof (error as ProviderRpcError).code == 'number';
+export function isUserRejectionError(error: unknown): boolean {
+    if (isObjectWithCodeProperty(error)) {
+        if (error.code === 4001) return true;
+        if (error.code === 'ACTION_REJECTED') return true;
+    }
+    return false;
 }

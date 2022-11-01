@@ -4,7 +4,7 @@ import { ChainInternal } from './Chain';
 import { OrderbookDEXInternal } from './OrderbookDEX';
 import { IOperatorFactory } from '@theorderbookdex/orderbook-dex-operator/dist/interfaces/IOperatorFactory';
 import { getDevChainFunds } from './dev-chain';
-import { isProviderRpcError, USER_REJECTED_REQUEST } from './ethereum';
+import { isUserRejectionError } from './ethereum';
 import { fetchOrderbook, Orderbook } from './Orderbook';
 import { checkAbortSignal, createSubAbortController, max, min } from './utils';
 import { abidecode, abiencode, ContractEvent, decodeErrorData, MAX_UINT32, Transaction } from '@frugal-wizard/abi2ts-lib';
@@ -280,10 +280,8 @@ export class WalletInternal extends Wallet {
                     accounts = await ethereum.request({ method: 'eth_accounts' });
                 }
             } catch (error) {
-                if (isProviderRpcError(error)) {
-                    if (error.code == USER_REJECTED_REQUEST) {
-                        throw new WalletConnectionRejected();
-                    }
+                if (isUserRejectionError(error)) {
+                    throw new WalletConnectionRejected();
                 }
                 throw error;
             }
@@ -318,10 +316,8 @@ export class WalletInternal extends Wallet {
                 accounts = await ethereum.request({ method: 'eth_accounts' });
             }
         } catch (error) {
-            if (isProviderRpcError(error)) {
-                if (error.code == USER_REJECTED_REQUEST) {
-                    throw new WalletConnectionRejected();
-                }
+            if (isUserRejectionError(error)) {
+                throw new WalletConnectionRejected();
             }
             throw error;
         }
@@ -335,10 +331,8 @@ export class WalletInternal extends Wallet {
         try {
             await operatorFactory.createOperator();
         } catch (error) {
-            if (isProviderRpcError(error)) {
-                if (error.code == USER_REJECTED_REQUEST) {
-                    throw new RegisterRejected();
-                }
+            if (isUserRejectionError(error)) {
+                throw new RegisterRejected();
             }
             throw error;
         }
@@ -395,10 +389,8 @@ export class WalletInternal extends Wallet {
             }
             await tokenContract.transfer(operator, amount);
         } catch (error) {
-            if (isProviderRpcError(error)) {
-                if (error.code == USER_REJECTED_REQUEST) {
-                    throw new OperationRejected();
-                }
+            if (isUserRejectionError(error)) {
+                throw new OperationRejected();
             }
             throw error;
         }
@@ -415,10 +407,8 @@ export class WalletInternal extends Wallet {
             }
             await operator.withdrawERC20([ [ token, amount ] ]);
         } catch (error) {
-            if (isProviderRpcError(error)) {
-                if (error.code == USER_REJECTED_REQUEST) {
-                    throw new OperationRejected();
-                }
+            if (isUserRejectionError(error)) {
+                throw new OperationRejected();
             }
             throw error;
         }
@@ -709,10 +699,8 @@ export class WalletInternal extends Wallet {
             await this.createOrder(hash, orderbook, OrderType.BUY, OrderExecutionType.MARKET, maxPrice, maxAmount);
         } catch (error) {
             checkAbortSignal(abortSignal);
-            if (isProviderRpcError(error)) {
-                if (error.code == USER_REJECTED_REQUEST) {
-                    throw new OperationRejected();
-                }
+            if (isUserRejectionError(error)) {
+                throw new OperationRejected();
             }
             throw error;
         }
@@ -735,10 +723,8 @@ export class WalletInternal extends Wallet {
             await this.createOrder(hash, orderbook, OrderType.SELL, OrderExecutionType.MARKET, minPrice, maxAmount);
         } catch (error) {
             checkAbortSignal(abortSignal);
-            if (isProviderRpcError(error)) {
-                if (error.code == USER_REJECTED_REQUEST) {
-                    throw new OperationRejected();
-                }
+            if (isUserRejectionError(error)) {
+                throw new OperationRejected();
             }
             throw error;
         }
@@ -761,10 +747,8 @@ export class WalletInternal extends Wallet {
             await this.createOrder(hash, orderbook, OrderType.BUY, OrderExecutionType.LIMIT, price, maxAmount);
         } catch (error) {
             checkAbortSignal(abortSignal);
-            if (isProviderRpcError(error)) {
-                if (error.code == USER_REJECTED_REQUEST) {
-                    throw new OperationRejected();
-                }
+            if (isUserRejectionError(error)) {
+                throw new OperationRejected();
             }
             throw error;
         }
@@ -787,10 +771,8 @@ export class WalletInternal extends Wallet {
             await this.createOrder(hash, orderbook, OrderType.SELL, OrderExecutionType.LIMIT, price, maxAmount);
         } catch (error) {
             checkAbortSignal(abortSignal);
-            if (isProviderRpcError(error)) {
-                if (error.code == USER_REJECTED_REQUEST) {
-                    throw new OperationRejected();
-                }
+            if (isUserRejectionError(error)) {
+                throw new OperationRejected();
             }
             throw error;
         }
@@ -808,10 +790,8 @@ export class WalletInternal extends Wallet {
             await this.saveOrder(order);
         } catch (error) {
             checkAbortSignal(abortSignal);
-            if (isProviderRpcError(error)) {
-                if (error.code == USER_REJECTED_REQUEST) {
-                    throw new OperationRejected();
-                }
+            if (isUserRejectionError(error)) {
+                throw new OperationRejected();
             }
             throw error;
         }
@@ -830,10 +810,8 @@ export class WalletInternal extends Wallet {
             await this.saveOrder(order);
         } catch (error) {
             checkAbortSignal(abortSignal);
-            if (isProviderRpcError(error)) {
-                if (error.code == USER_REJECTED_REQUEST) {
-                    throw new OperationRejected();
-                }
+            if (isUserRejectionError(error)) {
+                throw new OperationRejected();
             }
             throw error;
         }
