@@ -9,7 +9,8 @@
   "scripts": {
     "prepare": "gulp",
     "test": "mocha",
-    "lint": "eslint . --ext .ts"
+    "lint": "eslint . --ext .ts",
+    "typecheck": "tsc"
   },
   "dependencies": {
     "@frugal-wizard/abi2ts-lib": "^0.4.0",
