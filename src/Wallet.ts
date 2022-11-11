@@ -7,16 +7,16 @@ import { getDevChainFunds } from './dev-chain';
 import { isUserRejectionError } from './ethereum';
 import { fetchOrderbook, Orderbook } from './Orderbook';
 import { checkAbortSignal, createSubAbortController, max, min } from './utils';
-import { abidecode, abiencode, ContractEvent, decodeErrorData, MAX_UINT32, Transaction } from '@frugal-wizard/abi2ts-lib';
-import { BoughtAtMarket, Failed, IOperator, OrderCanceled, OrderClaimed, PlacedBuyOrder, PlacedSellOrder, SoldAtMarket } from '@theorderbookdex/orderbook-dex-operator/dist/interfaces/IOperator';
+import { ContractEvent, decodeErrorData, MAX_UINT32, Transaction } from '@frugal-wizard/abi2ts-lib';
 import { IERC20 } from '@theorderbookdex/orderbook-dex/dist/interfaces/IERC20';
 import { Cache } from './Cache';
-import { OrderInternal, Order, OrderExecutionType, OrderStatus, OrderType } from './Order';
+import { OrderInternal, Order, OrderExecutionType, OrderStatus, OrderType, encodeOrderType } from './Order';
 import { now } from './time';
 import { GenericEventListener } from './event-types';
 import { Token } from './Token';
 import { Canceled, Filled, IOrderbookV1 } from '@theorderbookdex/orderbook-dex-v1/dist/interfaces/IOrderbookV1';
 import { ChainEvents } from './ChainEvents';
+import { IOperatorV1, BoughtAtMarketV1, SoldAtMarketV1, PlacedBuyOrderV1, PlacedSellOrderV1, Failed, OrderClaimedV1, OrderCanceledV1 } from '@theorderbookdex/orderbook-dex-v1-operator/dist/interfaces/IOperatorV1';
 
 export interface TokenBalance {
     wallet: bigint;
@@ -329,7 +329,7 @@ export class WalletInternal extends Wallet {
             await getDevChainFunds();
         }
         try {
-            await operatorFactory.createOperator();
+            await operatorFactory.createOperator(10000n);
         } catch (error) {
             if (isUserRejectionError(error)) {
                 throw new RegisterRejected();
@@ -400,7 +400,7 @@ export class WalletInternal extends Wallet {
 
     async withdraw(token: Token, amount: bigint, abortSignal?: AbortSignal) {
         const tokenContract = IERC20.at(token.address);
-        const operator = IOperator.at(this._operator);
+        const operator = IOperatorV1.at(this._operator);
         try {
             if (await tokenContract.balanceOf(operator) < amount) {
                 throw new InsufficientFunds();
@@ -453,7 +453,7 @@ export class WalletInternal extends Wallet {
         order = { ...order, txHash: '' };
 
         for (const event of events) {
-            if (event instanceof BoughtAtMarket) {
+            if (event instanceof BoughtAtMarketV1) {
                 order = {
                     ...order,
                     filled: event.amountBought,
@@ -462,7 +462,7 @@ export class WalletInternal extends Wallet {
                     totalPriceClaimed: event.amountPaid,
                 };
 
-            } else if (event instanceof SoldAtMarket) {
+            } else if (event instanceof SoldAtMarketV1) {
                 order = {
                     ...order,
                     filled: event.amountSold,
@@ -471,13 +471,13 @@ export class WalletInternal extends Wallet {
                     totalPriceClaimed: event.amountReceived,
                 };
 
-            } else if (event instanceof PlacedBuyOrder) {
+            } else if (event instanceof PlacedBuyOrderV1) {
                 order = {
                     ...order,
                     id: event.orderId,
                 };
 
-            } else if (event instanceof PlacedSellOrder) {
+            } else if (event instanceof PlacedSellOrderV1) {
                 order = {
                     ...order,
                     id: event.orderId,
@@ -497,7 +497,8 @@ export class WalletInternal extends Wallet {
     }
 
     private async trackOrderFill(order: OrderInternal, abortSignal: AbortSignal) {
-        const [ type, price, id ] = abidecode(['uint8', 'uint256', 'uint32'], order.id as string) as [number, bigint, bigint];
+        const { price, id } = order;
+        const type = encodeOrderType(order.type);
         const orderbook = IOrderbookV1.at(order.orderbook.address);
 
         const updateOrder = async () => {
@@ -510,7 +511,7 @@ export class WalletInternal extends Wallet {
             if (!owner) {
                 order = {
                     ...order,
-                    id: '',
+                    id: 0n,
                     error: 'Order no longer exists',
                 };
                 await this.saveOrder(order, abortSignal);
@@ -559,7 +560,7 @@ export class WalletInternal extends Wallet {
         order = { ...order, claimTxHash: '' };
 
         for (const event of events) {
-            if (event instanceof OrderClaimed) {
+            if (event instanceof OrderClaimedV1) {
                 order = {
                     ...order,
                     claimed: order.claimed + event.amount,
@@ -586,7 +587,7 @@ export class WalletInternal extends Wallet {
         order = { ...order, cancelTxHash: '' };
 
         for (const event of events) {
-            if (event instanceof OrderCanceled) {
+            if (event instanceof OrderCanceledV1) {
                 order = {
                     ...order,
                     amount: order.amount - event.amount,
@@ -648,7 +649,7 @@ export class WalletInternal extends Wallet {
             owner: this._operator,
             orderbook,
             txHash,
-            id: '',
+            id: 0n,
             timestamp: now(),
             status: [],
             type,
@@ -684,18 +685,17 @@ export class WalletInternal extends Wallet {
     }
 
     async buyAtMarket(orderbook: Orderbook, maxAmount: bigint, maxPrice: bigint, abortSignal?: AbortSignal) {
-        const operator = IOperator.at(this._operator);
+        const operator = IOperatorV1.at(this._operator);
         const baseToken = IERC20.at(orderbook.baseToken.address);
         // TODO allow user to configure maxPricePoints
         const maxPricePoints = 255;
-        const extraData = abiencode([ 'uint8' ], [ maxPricePoints ]);
         // TODO estimate gas for transaction
         try {
             if (await baseToken.balanceOf(operator) < maxAmount * maxPrice) {
                 throw new InsufficientFunds();
             }
             // TODO check for more errors before sending transaction
-            const hash = await operator.sendTransaction.buyAtMarket(orderbook.address, maxAmount, maxPrice, extraData);
+            const hash = await operator.sendTransaction.buyAtMarketV1(orderbook.address, maxAmount, maxPrice, maxPricePoints);
             await this.createOrder(hash, orderbook, OrderType.BUY, OrderExecutionType.MARKET, maxPrice, maxAmount);
         } catch (error) {
             checkAbortSignal(abortSignal);
@@ -708,18 +708,17 @@ export class WalletInternal extends Wallet {
     }
 
     async sellAtMarket(orderbook: Orderbook, maxAmount: bigint, minPrice: bigint, abortSignal?: AbortSignal) {
-        const operator = IOperator.at(this._operator);
+        const operator = IOperatorV1.at(this._operator);
         const tradedToken = IERC20.at(orderbook.tradedToken.address);
         // TODO allow user to configure maxPricePoints
         const maxPricePoints = 255;
-        const extraData = abiencode([ 'uint8' ], [ maxPricePoints ]);
         // TODO estimate gas for transaction
         try {
             if (await tradedToken.balanceOf(operator) < maxAmount * orderbook.contractSize) {
                 throw new InsufficientFunds();
             }
             // TODO check for more errors before sending transaction
-            const hash = await operator.sendTransaction.sellAtMarket(orderbook.address, maxAmount, minPrice, extraData);
+            const hash = await operator.sendTransaction.sellAtMarketV1(orderbook.address, maxAmount, minPrice, maxPricePoints);
             await this.createOrder(hash, orderbook, OrderType.SELL, OrderExecutionType.MARKET, minPrice, maxAmount);
         } catch (error) {
             checkAbortSignal(abortSignal);
@@ -732,18 +731,17 @@ export class WalletInternal extends Wallet {
     }
 
     async placeBuyOrder(orderbook: Orderbook, maxAmount: bigint, price: bigint, abortSignal?: AbortSignal) {
-        const operator = IOperator.at(this._operator);
+        const operator = IOperatorV1.at(this._operator);
         const baseToken = IERC20.at(orderbook.baseToken.address);
         // TODO allow user to configure maxPricePoints
         const maxPricePoints = 255;
-        const extraData = abiencode([ 'uint8' ], [ maxPricePoints ]);
         // TODO estimate gas for transaction
         try {
             if (await baseToken.balanceOf(operator) < maxAmount * price) {
                 throw new InsufficientFunds();
             }
             // TODO check for more errors before sending transaction
-            const hash = await operator.sendTransaction.placeBuyOrder(orderbook.address, maxAmount, price, extraData);
+            const hash = await operator.sendTransaction.placeBuyOrderV1(orderbook.address, maxAmount, price, maxPricePoints);
             await this.createOrder(hash, orderbook, OrderType.BUY, OrderExecutionType.LIMIT, price, maxAmount);
         } catch (error) {
             checkAbortSignal(abortSignal);
@@ -756,18 +754,17 @@ export class WalletInternal extends Wallet {
     }
 
     async placeSellOrder(orderbook: Orderbook, maxAmount: bigint, price: bigint, abortSignal?: AbortSignal) {
-        const operator = IOperator.at(this._operator);
+        const operator = IOperatorV1.at(this._operator);
         const tradedToken = IERC20.at(orderbook.tradedToken.address);
         // TODO allow user to configure maxPricePoints
         const maxPricePoints = 255;
-        const extraData = abiencode([ 'uint8' ], [ maxPricePoints ]);
         // TODO estimate gas for transaction
         try {
             if (await tradedToken.balanceOf(operator) < maxAmount * orderbook.contractSize) {
                 throw new InsufficientFunds();
             }
             // TODO check for more errors before sending transaction
-            const hash = await operator.sendTransaction.placeSellOrder(orderbook.address, maxAmount, price, extraData);
+            const hash = await operator.sendTransaction.placeSellOrderV1(orderbook.address, maxAmount, price, maxPricePoints);
             await this.createOrder(hash, orderbook, OrderType.SELL, OrderExecutionType.LIMIT, price, maxAmount);
         } catch (error) {
             checkAbortSignal(abortSignal);
@@ -780,11 +777,12 @@ export class WalletInternal extends Wallet {
     }
 
     async claimOrder(order: OrderInternal, abortSignal?: AbortSignal) {
-        const operator = IOperator.at(this._operator);
+        const operator = IOperatorV1.at(this._operator);
         const maxAmount = MAX_UINT32;
-        const extraData = abiencode([ 'uint32' ], [ maxAmount ]);
         try {
-            const claimTxHash = await operator.sendTransaction.claimOrder(order.orderbook, order.id, extraData);
+            const { orderbook, price, id } = order;
+            const type = encodeOrderType(order.type);
+            const claimTxHash = await operator.sendTransaction.claimOrderV1(orderbook, type, price, id, maxAmount);
             order = await this.refreshOrder(order);
             order = { ...order, claimTxHash };
             await this.saveOrder(order);
@@ -799,12 +797,13 @@ export class WalletInternal extends Wallet {
     }
 
     async cancelOrder(order: OrderInternal, abortSignal?: AbortSignal) {
-        const operator = IOperator.at(this._operator);
+        const operator = IOperatorV1.at(this._operator);
         // TODO allow user to configure maxLastOrderId
         const maxLastOrderId = MAX_UINT32;
-        const extraData = abiencode([ 'uint32' ], [ maxLastOrderId ]);
         try {
-            const cancelTxHash = await operator.sendTransaction.cancelOrder(order.orderbook, order.id, extraData);
+            const { orderbook, price, id } = order;
+            const type = encodeOrderType(order.type);
+            const cancelTxHash = await operator.sendTransaction.cancelOrderV1(orderbook, type, price, id, maxLastOrderId);
             order = await this.refreshOrder(order);
             order = { ...order, cancelTxHash };
             await this.saveOrder(order);

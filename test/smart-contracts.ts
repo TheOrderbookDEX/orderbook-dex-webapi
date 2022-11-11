@@ -1,13 +1,12 @@
 import { AddressBook } from '@frugal-wizard/addressbook/dist/AddressBook';
 import { ERC20Mock } from '@theorderbookdex/orderbook-dex/dist/testing/ERC20Mock';
-import { OperatorLogicRegistry } from '@theorderbookdex/orderbook-dex-operator/dist/OperatorLogicRegistry';
 import { OperatorFactory } from '@theorderbookdex/orderbook-dex-operator/dist/OperatorFactory';
-import { OperatorLogicV1 } from '@theorderbookdex/orderbook-dex-v1/dist/OperatorLogicV1';
 import { OrderbookFactoryV1 } from '@theorderbookdex/orderbook-dex-v1/dist/OrderbookFactoryV1';
 import { IOrderbookV1 } from '@theorderbookdex/orderbook-dex-v1/dist/interfaces/IOrderbookV1';
 import { IERC20 } from '@theorderbookdex/orderbook-dex/dist/interfaces/IERC20';
 import { createSigner, getAccounts, getBalance, getBlockTimestamp, hexstring, Signer } from '@frugal-wizard/abi2ts-lib';
 import { EthereumProvider } from 'ganache';
+import { OperatorV1 } from '@theorderbookdex/orderbook-dex-v1-operator/dist/OperatorV1';
 
 interface Global {
     ethereum?: EthereumProvider;
@@ -19,9 +18,8 @@ export async function setUpSmartContracts() {
     const signer = await createSigner('0x0000000000000000000000000000000000000000000000000000000000000001');
     await global.ethereum?.send('evm_setAccountBalance', [ signer.address, hexstring(1000000000000000000000n) ]);
     const addressBook      = (await signer.sendTransaction(await AddressBook.populateTransaction.deploy())).contractAddress;
-    const logicRegistry    = (await signer.sendTransaction(await OperatorLogicRegistry.populateTransaction.deploy())).contractAddress;
-                             (await signer.sendTransaction(await OperatorFactory.populateTransaction.deploy(logicRegistry, addressBook))).contractAddress;
-    const operatorLogic    = (await signer.sendTransaction(await OperatorLogicV1.populateTransaction.deploy())).contractAddress;
+    const operatorFactory  = (await signer.sendTransaction(await OperatorFactory.populateTransaction.deploy(signer.address, addressBook))).contractAddress;
+    const operatorV1       = (await signer.sendTransaction(await OperatorV1.populateTransaction.deploy())).contractAddress;
     const orderbookFactory = (await signer.sendTransaction(await OrderbookFactoryV1.populateTransaction.deploy(addressBook))).contractAddress;
     const WBTC             = (await signer.sendTransaction(await ERC20Mock.populateTransaction.deploy('Wrapped BTC', 'WBTC', 18))).contractAddress;
     const WETH             = (await signer.sendTransaction(await ERC20Mock.populateTransaction.deploy('Wrapped Ether', 'WETH', 18))).contractAddress;
@@ -32,18 +30,18 @@ export async function setUpSmartContracts() {
     await signer.sendTransaction(await OrderbookFactoryV1.at(orderbookFactory).populateTransaction.createOrderbook(WETH, USDT, 10000000000000000n, 10000000n));
     await signer.sendTransaction(await OrderbookFactoryV1.at(orderbookFactory).populateTransaction.createOrderbook(BNB,  USDT, 100000000000000000n, 1000000n));
     await signer.sendTransaction(await OrderbookFactoryV1.at(orderbookFactory).populateTransaction.createOrderbook(WXRP, USDT, 1000000000000000000n,  10000n));
-    await signer.sendTransaction(await OperatorLogicRegistry.at(logicRegistry).populateTransaction.register(10000n, operatorLogic));
+    await signer.sendTransaction(await OperatorFactory.at(operatorFactory).populateTransaction.registerVersion(10000n, operatorV1));
 }
 
 export async function createAuxSigner() {
     const signer = await createSigner('0x0000000000000000000000000000000000000000000000000000000000000003');
     if (!await getBalance(signer.address)) {
         await global.ethereum?.send('evm_setAccountBalance', [ signer.address, hexstring(1000000000000000000000n) ]);
+        await signer.sendTransaction(await ERC20Mock.at('0xB9816fC57977D5A786E654c7CF76767be63b966e').populateTransaction.giveMe(1000000000000000000000n));
         await signer.sendTransaction(await ERC20Mock.at('0x6D411e0A54382eD43F02410Ce1c7a7c122afA6E1').populateTransaction.giveMe(1000000000000000000000n));
         await signer.sendTransaction(await ERC20Mock.at('0x5CF7F96627F3C9903763d128A1cc5D97556A6b99').populateTransaction.giveMe(1000000000000000000000n));
         await signer.sendTransaction(await ERC20Mock.at('0xA3183498b579bd228aa2B62101C40CC1da978F24').populateTransaction.giveMe(1000000000000000000000n));
-        await signer.sendTransaction(await ERC20Mock.at('0x63f58053c9499E1104a6f6c6d2581d6D83067EEB').populateTransaction.giveMe(1000000000000000000000n));
-        await signer.sendTransaction(await ERC20Mock.at('0x66a15edcC3b50a663e72F1457FFd49b9AE284dDc').populateTransaction.giveMe(1000000000000n));
+        await signer.sendTransaction(await ERC20Mock.at('0x63f58053c9499E1104a6f6c6d2581d6D83067EEB').populateTransaction.giveMe(1000000000000n));
         await signer.sendTransaction(await AddressBook.at('0xF2E246BB76DF876Cef8b38ae84130F4F55De395b').populateTransaction.register());
     }
     return signer;
@@ -150,9 +148,9 @@ export async function simulateTicks(address: string, prices: bigint[], timeFrame
 export async function giveMeFunds() {
     const [ address ] = await getAccounts();
     await global.ethereum?.send('evm_setAccountBalance', [ address, hexstring(1000000000000000000000n) ]);
+    await ERC20Mock.at('0xB9816fC57977D5A786E654c7CF76767be63b966e').giveMe(1000000000000000000000n);
     await ERC20Mock.at('0x6D411e0A54382eD43F02410Ce1c7a7c122afA6E1').giveMe(1000000000000000000000n);
     await ERC20Mock.at('0x5CF7F96627F3C9903763d128A1cc5D97556A6b99').giveMe(1000000000000000000000n);
     await ERC20Mock.at('0xA3183498b579bd228aa2B62101C40CC1da978F24').giveMe(1000000000000000000000n);
-    await ERC20Mock.at('0x63f58053c9499E1104a6f6c6d2581d6D83067EEB').giveMe(1000000000000000000000n);
-    await ERC20Mock.at('0x66a15edcC3b50a663e72F1457FFd49b9AE284dDc').giveMe(1000000000000n);
+    await ERC20Mock.at('0x63f58053c9499E1104a6f6c6d2581d6D83067EEB').giveMe(1000000000000n);
 }

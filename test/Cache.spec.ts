@@ -17,23 +17,18 @@ describe('Cache', function() {
         resetIndexedDB();
     });
 
-    describe('upgrade', function() {
+    // no need to test upgrade for now, we are resetting the db in version 3
+    describe.skip('upgrade', function() {
         // TODO test Cache upgrade thoroughly
 
-        describe('version 2 from 1', function() {
+        describe('from version 3', function() {
             beforeEach(async function() {
-                await Cache.load(1, 1);
+                await Cache.load(1, 3);
                 Cache.unload();
             });
 
             it('should work', async function() {
-                await Cache.load(1, 2);
-            });
-        });
-
-        describe('version 2 from 0', function() {
-            it('should work', async function() {
-                await Cache.load(1, 2);
+                await Cache.load(1);
             });
         });
     });

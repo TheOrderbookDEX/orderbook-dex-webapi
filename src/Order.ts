@@ -17,6 +17,19 @@ export enum OrderType {
 }
 
 /**
+ * Encode order type to numeric value used in smart contract.
+ *
+ * @param orderType the order type
+ * @returns the encoded order type
+ */
+export function encodeOrderType(orderType: OrderType): number {
+    switch (orderType) {
+        case OrderType.SELL: return 0;
+        case OrderType.BUY:  return 1;
+    }
+}
+
+/**
  * Order execution type.
  */
 export enum OrderExecutionType {
@@ -194,7 +207,7 @@ export interface OrderInternal extends Order {
     /**
      * The id of this order.
      */
-    readonly id: string;
+    readonly id: bigint;
 
     /**
      * The transaction hash of the current claim operation.

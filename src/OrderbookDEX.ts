@@ -92,7 +92,7 @@ export class OrderbookDEXInternal extends OrderbookDEX {
 
     static async connect(): Promise<OrderbookDEXInternal> {
         if (!this._instance) {
-            const config = chainConfigs[Chain.instance.chainId];
+            const config = orderbookDEXChainConfigs[Chain.instance.chainId];
             if (!config) {
                 throw new ChainNotSupported();
             }
@@ -112,7 +112,7 @@ export class OrderbookDEXInternal extends OrderbookDEX {
         delete this._instance;
     }
 
-    constructor(public readonly _config: ChainConfig) {
+    constructor(public readonly _config: OrderbookDEXChainConfig) {
         super();
     }
 
@@ -170,15 +170,15 @@ export class ChainNotSupported extends Error {
     }
 }
 
-interface ChainConfig {
+interface OrderbookDEXChainConfig {
     readonly operatorFactory: Address;
     readonly orderbookFactoryV1: Address;
     readonly orderbooks: Address[];
 }
 
-const chainConfigs: { [chainId: number]: ChainConfig | undefined } = {};
+export const orderbookDEXChainConfigs: { [chainId: number]: OrderbookDEXChainConfig | undefined } = {};
 
-chainConfigs[5] = {
+orderbookDEXChainConfigs[5] = {
     operatorFactory: '0x7BF5889661f06B7d287C6acBA754d318F17E4A52' as Address,
     orderbookFactoryV1: '0xdFbd8e2360B96C0bd4A00d4D1271A33f0C6E75C7' as Address,
     orderbooks: [
@@ -187,13 +187,13 @@ chainConfigs[5] = {
     ],
 };
 
-chainConfigs[1337] = {
-    operatorFactory: '0xDe09E74d4888Bc4e65F589e8c13Bce9F71DdF4c7' as Address,
-    orderbookFactoryV1: '0xB9816fC57977D5A786E654c7CF76767be63b966e' as Address,
+orderbookDEXChainConfigs[1337] = {
+    operatorFactory: '0x2946259E0334f33A064106302415aD3391BeD384' as Address,
+    orderbookFactoryV1: '0x51a240271AB8AB9f9a21C82d9a85396b704E164d' as Address,
     orderbooks: [
-        '0xEbF7a4c0856859eE173FAc8Cc7eb0488950538fb' as Address,
-        '0xE2873261f82fdC86FB9e45c277381d1314EF167C' as Address,
-        '0x64F18F65dB29D1eF902Ec0D1671bFd6dA3285C38' as Address,
-        '0x825F774215B9AadEDF23B48F25De5384973cd7da' as Address,
+        '0x3E920B0890189806A99451699e4e531E81035BA6' as Address,
+        '0x119F7448b228415C974f5814462Ec5a87837678f' as Address,
+        '0xB880b3FB12a48815fD79E30394a8F336159d3188' as Address,
+        '0xD86519C020EfC929eb2D0B967499267f287493c7' as Address,
     ],
 };

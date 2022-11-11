@@ -8,39 +8,36 @@ export class Cache {
 
     static async load(chainId: number, version?: number) {
         if (!this._instance) {
-            if (!version || version > 2) version = 2;
-            const db = await openDB<CacheV2>(`Cache${chainId}`, version, {
-                async upgrade(db, oldVersion, newVersion: number, tx) {
-                    if (oldVersion < 1 && newVersion >= 1) {
-                        const v1db = db as unknown as IDBPDatabase<CacheV1>;
-                        v1db.createObjectStore('blocks', {
+            if (!version || version > 3) version = 3;
+            if (version < 3) throw new Error('version removed');
+            const db = await openDB<CacheV3>(`Cache${chainId}`, version, {
+                async upgrade(db, oldVersion, newVersion: number) {
+                    if (oldVersion < 3) {
+                        const olddb = db as IDBPDatabase;
+                        for (const name of olddb.objectStoreNames) {
+                            olddb.deleteObjectStore(name);
+                        }
+                    }
+                    if (newVersion >= 3) {
+                        db.createObjectStore('blocks', {
                             keyPath: 'blockNumber',
                         });
-                        v1db.createObjectStore('tokens', {
+                        db.createObjectStore('tokens', {
                             keyPath: 'address',
                         });
-                        v1db.createObjectStore('orderbooks', {
+                        db.createObjectStore('orderbooks', {
                             keyPath: 'address',
                         });
-                        v1db.createObjectStore('priceHistoryRanges', {
+                        db.createObjectStore('priceHistoryRanges', {
                             keyPath: ['orderbook', 'toBlock'],
                         });
-                        v1db.createObjectStore('priceHistoryTicks', {
+                        db.createObjectStore('priceHistoryTicks', {
                             keyPath: ['orderbook', 'blockNumber', 'logIndex'],
                         });
-                        const orders = v1db.createObjectStore('orders', {
+                        const orders = db.createObjectStore('orders', {
                             keyPath: 'key',
                         });
                         orders.createIndex('byOwner', ['owner', 'timestamp'], { unique: false });
-                        if (newVersion == 1) {
-                            orders.createIndex('byMainStatus', ['owner', 'mainStatus'], { unique: false });
-                        }
-                    }
-                    if (oldVersion < 2 && newVersion >= 2) {
-                        const orders = tx.objectStore('orders');
-                        if (oldVersion == 1) {
-                            orders.deleteIndex('byMainStatus');
-                        }
                         orders.createIndex('byMainStatus', ['owner', 'mainStatus', 'timestamp'], { unique: false });
                     }
                 }
@@ -63,7 +60,7 @@ export class Cache {
         }
     }
 
-    constructor(private readonly _db: IDBPDatabase<CacheV2>) {}
+    constructor(private readonly _db: IDBPDatabase<CacheV3>) {}
 
     async getBlockTimestamp(blockNumber: number, abortSignal?: AbortSignal) {
         checkAbortSignal(abortSignal);
@@ -124,7 +121,7 @@ export class Cache {
     }
 
     private async _getPriceHistoryRanges(
-        tx: IDBPTransaction<CacheV2, ['priceHistoryRanges'], 'readonly' | 'readwrite'>,
+        tx: IDBPTransaction<CacheV3, ['priceHistoryRanges'], 'readonly' | 'readwrite'>,
         orderbook: Address, fromBlock: number, toBlock: number
     ) {
         const keyRange = IDBKeyRange.bound([orderbook, fromBlock], [orderbook, toBlock]);
@@ -323,7 +320,7 @@ export interface CachedOrder {
     timestamp: number;
     orderbook: Address;
     txHash: string;
-    id: string;
+    id: bigint;
     mainStatus: CachedOrderMainStatus;
     status: readonly OrderStatus[];
     type: OrderType;
@@ -340,7 +337,7 @@ export interface CachedOrder {
     cancelTxHash: string;
 }
 
-interface CacheV1 extends DBSchema {
+interface CacheV3 extends DBSchema {
     blocks: {
         key: CachedBlock['blockNumber'];
         value: CachedBlock;
@@ -368,28 +365,6 @@ interface CacheV1 extends DBSchema {
         ];
         value: CachedPriceHistoryTick;
     },
-    orders: {
-        key: CachedOrder['key'];
-        value: CachedOrder;
-        indexes: {
-            byOwner: [
-                CachedOrder['owner'],
-                CachedOrder['timestamp'],
-            ];
-            byMainStatus: [
-                CachedOrder['owner'],
-                CachedOrder['mainStatus'],
-            ];
-        };
-    },
-}
-
-interface CacheV2 extends DBSchema {
-    blocks: CacheV1['blocks'],
-    tokens: CacheV1['tokens'],
-    orderbooks: CacheV1['orderbooks'],
-    priceHistoryRanges: CacheV1['priceHistoryRanges'],
-    priceHistoryTicks: CacheV1['priceHistoryTicks'],
     orders: {
         key: CachedOrder['key'];
         value: CachedOrder;
