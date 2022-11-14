@@ -23,7 +23,7 @@ export interface TokenBalance {
     operator: bigint;
 }
 
-export enum WalletEventType {
+export enum OperatorEventType {
     /**
      * Event type dispatched when an order is created.
      */
@@ -51,58 +51,62 @@ export enum WalletEventType {
 }
 
 /**
- * Crypto Wallet connection.
+ * Connection to the Operator smart contract (and to the wallet).
  */
-export abstract class Wallet extends EventTarget {
+export abstract class Operator extends EventTarget {
     /**
-     * Connect to the wallet.
+     * Connect to the Operator.
      *
      * @param  requestUserPermission Whether to request user permission to connect to the wallet
      *                               if required. Optional, true by default.
-     * @return The wallet.
+     * @return The connection to the operator.
      * @throws {ChainNotConnected} When connection to the blockchain has not been established.
      * @throws {PermissionToWalletRequired} When the user needs to be asked for permission to
      *                                      connect to the wallet.
-     * @throws {WalletConnectionRejected} When user rejected the request to connect the wallet.
+     * @throws {RequestRejected} When the user rejects the request.
      * @throws {WalletAddressNotFound} When an address is not provided by the wallet.
-     * @throws {RegisterRequired} When the user needs to register.
+     * @throws {OperatorNotCreated} When the user needs to register.
      */
-    static async connect(requestUserPermission = true): Promise<Wallet> {
-        return await WalletInternal.connect(requestUserPermission);
+    static async connect(requestUserPermission = true): Promise<Operator> {
+        return await OperatorInternal.connect(requestUserPermission);
     }
 
     /**
-     * Connect to the wallet and register.
+     * Create operator and connect.
      *
-     * @return The wallet.
+     * @return The connection to the operator.
      * @throws {ChainNotConnected} When connection to the blockchain has not been established.
-     * @throws {WalletConnectionRejected} When user rejected the request to connect the wallet.
+     * @throws {RequestRejected} When the user rejects the request.
      * @throws {WalletAddressNotFound} When an address is not provided by the wallet.
-     * @throws {AlreadyRegistered} When the user is already registered.
-     * @throws {RegisterRejected} When the user rejects the request to create the operator.
+     * @throws {OperatorAlreadyCreated} When the operator has been created already.
      */
-    static async register(): Promise<Wallet> {
-        return await WalletInternal.register();
+    static async create(): Promise<Operator> {
+        return await OperatorInternal.register();
     }
 
     /**
-     * The connection to the wallet.
+     * The connection to the operator.
      */
-    static get instance(): Wallet {
-        return WalletInternal.instance;
+    static get instance(): Operator {
+        return OperatorInternal.instance;
     }
 
     /**
-     * Disconnect from the wallet.
+     * Disconnect from the operator.
      */
     static disconnect(): void {
-        WalletInternal.disconnect();
+        OperatorInternal.disconnect();
     }
 
     /**
      * The address of the wallet.
      */
-    abstract get address(): Address;
+    abstract get walletAddress(): Address;
+
+    /**
+     * The address of the operator.
+     */
+    abstract get operatorAddress(): Address;
 
     /**
      * Get the amount of tokens the user has in the wallet and the operator.
@@ -117,9 +121,10 @@ export abstract class Wallet extends EventTarget {
      * Deposit an amount of tokens into the operator.
      *
      * @param token       The token.
-     * @param amount        The amount.
+     * @param amount      The amount.
      * @param abortSignal A signal to abort. It won't stop the blockchain transaction, just
      *                    prevent the promise from returning.
+     * @throws {RequestRejected} When the user rejects the request.
      */
     abstract deposit(token: Token, amount: bigint, abortSignal?: AbortSignal): Promise<void>;
 
@@ -130,6 +135,7 @@ export abstract class Wallet extends EventTarget {
      * @param amount      The amount.
      * @param abortSignal A signal to abort. It won't stop the blockchain transaction, just
      *                    prevent the promise from returning.
+     * @throws {RequestRejected} When the user rejects the request.
      */
     abstract withdraw(token: Token, amount: bigint, abortSignal?: AbortSignal): Promise<void>;
 
@@ -174,6 +180,7 @@ export abstract class Wallet extends EventTarget {
      * @param maxPrice      The maximum price to pay for each contract.
      * @param abortSignal   A signal to abort. It won't stop the blockchain transaction, just
      *                      prevent the promise from returning.
+     * @throws {RequestRejected} When the user rejects the request.
      */
     abstract buyAtMarket(orderbook: Orderbook, maxAmount: bigint, maxPrice: bigint, abortSignal?: AbortSignal): Promise<void>;
 
@@ -185,6 +192,7 @@ export abstract class Wallet extends EventTarget {
      * @param minPrice      The minimum price to sell each contract for.
      * @param abortSignal   A signal to abort. It won't stop the blockchain transaction, just
      *                      prevent the promise from returning.
+     * @throws {RequestRejected} When the user rejects the request.
      */
     abstract sellAtMarket(orderbook: Orderbook, maxAmount: bigint, minPrice: bigint, abortSignal?: AbortSignal): Promise<void>;
 
@@ -196,6 +204,7 @@ export abstract class Wallet extends EventTarget {
      * @param price         The price to pay for each contract.
      * @param abortSignal   A signal to abort. It won't stop the blockchain transaction, just
      *                      prevent the promise from returning.
+     * @throws {RequestRejected} When the user rejects the request.
      */
     abstract placeBuyOrder(orderbook: Orderbook, maxAmount: bigint, price: bigint, abortSignal?: AbortSignal): Promise<void>;
 
@@ -207,6 +216,7 @@ export abstract class Wallet extends EventTarget {
      * @param price         The price to sell each contract for.
      * @param abortSignal   A signal to abort. It won't stop the blockchain transaction, just
      *                      prevent the promise from returning.
+     * @throws {RequestRejected} When the user rejects the request.
      */
     abstract placeSellOrder(orderbook: Orderbook, maxAmount: bigint, price: bigint, abortSignal?: AbortSignal): Promise<void>;
 
@@ -216,6 +226,7 @@ export abstract class Wallet extends EventTarget {
      * @param order       The order.
      * @param abortSignal A signal to abort. It won't stop the blockchain transaction, just
      *                    prevent the promise from returning.
+     * @throws {RequestRejected} When the user rejects the request.
      */
     abstract claimOrder(order: Order, abortSignal?: AbortSignal): Promise<void>;
 
@@ -225,6 +236,7 @@ export abstract class Wallet extends EventTarget {
      * @param order       The order.
      * @param abortSignal A signal to abort. It won't stop the blockchain transaction, just
      *                    prevent the promise from returning.
+     * @throws {RequestRejected} When the user rejects the request.
      */
     abstract cancelOrder(order: Order, abortSignal?: AbortSignal): Promise<void>;
 
@@ -238,25 +250,25 @@ export abstract class Wallet extends EventTarget {
      */
     abstract dismissOrder(order: Order, abortSignal?: AbortSignal): Promise<void>;
 
-    addEventListener(type: WalletEventType.ORDER_CREATED, callback: GenericEventListener<OrderCreatedEvent> | null, options?: boolean | AddEventListenerOptions): void;
-    addEventListener(type: WalletEventType.ORDER_UPDATED, callback: GenericEventListener<OrderUpdatedEvent> | null, options?: boolean | AddEventListenerOptions): void;
-    addEventListener(type: WalletEventType.ORDER_REMOVED, callback: GenericEventListener<OrderRemovedEvent> | null, options?: boolean | AddEventListenerOptions): void;
-    addEventListener(type: WalletEventType.TOKEN_DEPOSITED, callback: GenericEventListener<TokenDepositedEvent> | null, options?: boolean | AddEventListenerOptions): void;
-    addEventListener(type: WalletEventType.TOKEN_WITHDRAWN, callback: GenericEventListener<TokenWithdrawnEvent> | null, options?: boolean | AddEventListenerOptions): void;
-    addEventListener(type: WalletEventType, callback: GenericEventListener<WalletEvent> | null, options?: boolean | AddEventListenerOptions): void {
+    addEventListener(type: OperatorEventType.ORDER_CREATED, callback: GenericEventListener<OrderCreatedEvent> | null, options?: boolean | AddEventListenerOptions): void;
+    addEventListener(type: OperatorEventType.ORDER_UPDATED, callback: GenericEventListener<OrderUpdatedEvent> | null, options?: boolean | AddEventListenerOptions): void;
+    addEventListener(type: OperatorEventType.ORDER_REMOVED, callback: GenericEventListener<OrderRemovedEvent> | null, options?: boolean | AddEventListenerOptions): void;
+    addEventListener(type: OperatorEventType.TOKEN_DEPOSITED, callback: GenericEventListener<TokenDepositedEvent> | null, options?: boolean | AddEventListenerOptions): void;
+    addEventListener(type: OperatorEventType.TOKEN_WITHDRAWN, callback: GenericEventListener<TokenWithdrawnEvent> | null, options?: boolean | AddEventListenerOptions): void;
+    addEventListener(type: OperatorEventType, callback: GenericEventListener<OperatorEvent> | null, options?: boolean | AddEventListenerOptions): void {
         super.addEventListener(type, callback, options);
     }
 
-    removeEventListener(type: WalletEventType.ORDER_CREATED, callback: GenericEventListener<OrderCreatedEvent> | null, options?: boolean | AddEventListenerOptions): void;
-    removeEventListener(type: WalletEventType.ORDER_UPDATED, callback: GenericEventListener<OrderUpdatedEvent> | null, options?: boolean | AddEventListenerOptions): void;
-    removeEventListener(type: WalletEventType.ORDER_REMOVED, callback: GenericEventListener<OrderRemovedEvent> | null, options?: boolean | AddEventListenerOptions): void;
-    removeEventListener(type: WalletEventType.TOKEN_DEPOSITED, callback: GenericEventListener<TokenDepositedEvent> | null, options?: boolean | AddEventListenerOptions): void;
-    removeEventListener(type: WalletEventType.TOKEN_WITHDRAWN, callback: GenericEventListener<TokenWithdrawnEvent> | null, options?: boolean | AddEventListenerOptions): void;
-    removeEventListener(type: WalletEventType, callback: GenericEventListener<WalletEvent> | null, options?: boolean | EventListenerOptions): void {
+    removeEventListener(type: OperatorEventType.ORDER_CREATED, callback: GenericEventListener<OrderCreatedEvent> | null, options?: boolean | AddEventListenerOptions): void;
+    removeEventListener(type: OperatorEventType.ORDER_UPDATED, callback: GenericEventListener<OrderUpdatedEvent> | null, options?: boolean | AddEventListenerOptions): void;
+    removeEventListener(type: OperatorEventType.ORDER_REMOVED, callback: GenericEventListener<OrderRemovedEvent> | null, options?: boolean | AddEventListenerOptions): void;
+    removeEventListener(type: OperatorEventType.TOKEN_DEPOSITED, callback: GenericEventListener<TokenDepositedEvent> | null, options?: boolean | AddEventListenerOptions): void;
+    removeEventListener(type: OperatorEventType.TOKEN_WITHDRAWN, callback: GenericEventListener<TokenWithdrawnEvent> | null, options?: boolean | AddEventListenerOptions): void;
+    removeEventListener(type: OperatorEventType, callback: GenericEventListener<OperatorEvent> | null, options?: boolean | EventListenerOptions): void {
         super.removeEventListener(type, callback, options);
     }
 
-    dispatchEvent(event: WalletEvent): boolean {
+    dispatchEvent(event: OperatorEvent): boolean {
         return super.dispatchEvent(event);
     }
 
@@ -265,10 +277,10 @@ export abstract class Wallet extends EventTarget {
     }
 }
 
-export class WalletInternal extends Wallet {
-    private static _instance?: WalletInternal;
+export class OperatorInternal extends Operator {
+    private static _instance?: OperatorInternal;
 
-    static async connect(requestUserPermission: boolean): Promise<WalletInternal> {
+    static async connect(requestUserPermission: boolean): Promise<OperatorInternal> {
         if (!this._instance) {
             const operatorFactory = IOperatorFactory.at(OrderbookDEXInternal.instance._config.operatorFactory);
             const ethereum = ChainInternal.instance._ethereum;
@@ -281,7 +293,7 @@ export class WalletInternal extends Wallet {
                 }
             } catch (error) {
                 if (isUserRejectionError(error)) {
-                    throw new WalletConnectionRejected();
+                    throw new RequestRejected();
                 }
                 throw error;
             }
@@ -294,17 +306,17 @@ export class WalletInternal extends Wallet {
             }
             const operator = await operatorFactory.operator(accounts[0]);
             if (operator == ZERO_ADDRESS) {
-                throw new RegisterRequired();
+                throw new OperatorNotCreated();
             }
-            this._instance = new WalletInternal(accounts[0] as Address, operator as Address);
+            this._instance = new OperatorInternal(accounts[0] as Address, operator as Address);
             APIEvents.instance.dispatchEvent(new WalletConnectedEvent());
         }
         return this._instance;
     }
 
-    static async register(): Promise<WalletInternal> {
+    static async register(): Promise<OperatorInternal> {
         if (this._instance) {
-            throw new AlreadyRegistered();
+            throw new OperatorAlreadyCreated();
         }
         const operatorFactory = IOperatorFactory.at(OrderbookDEXInternal.instance._config.operatorFactory);
         const ethereum = ChainInternal.instance._ethereum;
@@ -317,13 +329,13 @@ export class WalletInternal extends Wallet {
             }
         } catch (error) {
             if (isUserRejectionError(error)) {
-                throw new WalletConnectionRejected();
+                throw new RequestRejected();
             }
             throw error;
         }
         if (!accounts.length) throw new WalletAddressNotFound();
         if (await operatorFactory.operator(accounts[0]) != ZERO_ADDRESS) {
-            throw new AlreadyRegistered();
+            throw new OperatorAlreadyCreated();
         }
         if (ChainInternal.instance.chainId == 1337) {
             await getDevChainFunds();
@@ -332,12 +344,12 @@ export class WalletInternal extends Wallet {
             await operatorFactory.createOperator(10000n);
         } catch (error) {
             if (isUserRejectionError(error)) {
-                throw new RegisterRejected();
+                throw new RequestRejected();
             }
             throw error;
         }
         const operator = await operatorFactory.operator(accounts[0]);
-        this._instance = new WalletInternal(accounts[0] as Address, operator as Address);
+        this._instance = new OperatorInternal(accounts[0] as Address, operator as Address);
         APIEvents.instance.dispatchEvent(new WalletConnectedEvent());
         return this._instance;
     }
@@ -349,9 +361,9 @@ export class WalletInternal extends Wallet {
         }
     }
 
-    static get instance(): WalletInternal {
+    static get instance(): OperatorInternal {
         if (!this._instance) {
-            throw new WalletNotConnected();
+            throw new OperatorNotConnected();
         }
         return this._instance;
     }
@@ -359,8 +371,8 @@ export class WalletInternal extends Wallet {
     private readonly abortController = new AbortController();
 
     constructor(
-        public readonly address: Address,
-        public readonly _operator: Address,
+        public readonly walletAddress: Address,
+        public readonly operatorAddress: Address,
     ) {
         super();
         void (async () => {
@@ -372,17 +384,17 @@ export class WalletInternal extends Wallet {
 
     async getBalance(token: Token, abortSignal?: AbortSignal) {
         const contract = IERC20.at(token.address);
-        const wallet = await contract.balanceOf(this.address);
+        const wallet = await contract.balanceOf(this.walletAddress);
         checkAbortSignal(abortSignal);
-        const operator = await contract.balanceOf(this._operator);
+        const operator = await contract.balanceOf(this.operatorAddress);
         checkAbortSignal(abortSignal);
         return { wallet, operator };
     }
 
     async deposit(token: Token, amount: bigint, abortSignal?: AbortSignal) {
         const tokenContract = IERC20.at(token.address);
-        const sender = this.address
-        const operator = this._operator;
+        const sender = this.walletAddress
+        const operator = this.operatorAddress;
         try {
             if (await tokenContract.balanceOf(sender) < amount) {
                 throw new InsufficientFunds();
@@ -390,7 +402,7 @@ export class WalletInternal extends Wallet {
             await tokenContract.transfer(operator, amount);
         } catch (error) {
             if (isUserRejectionError(error)) {
-                throw new OperationRejected();
+                throw new RequestRejected();
             }
             throw error;
         }
@@ -400,7 +412,7 @@ export class WalletInternal extends Wallet {
 
     async withdraw(token: Token, amount: bigint, abortSignal?: AbortSignal) {
         const tokenContract = IERC20.at(token.address);
-        const operator = IOperatorV1.at(this._operator);
+        const operator = IOperatorV1.at(this.operatorAddress);
         try {
             if (await tokenContract.balanceOf(operator) < amount) {
                 throw new InsufficientFunds();
@@ -408,7 +420,7 @@ export class WalletInternal extends Wallet {
             await operator.withdrawERC20([ [ token, amount ] ]);
         } catch (error) {
             if (isUserRejectionError(error)) {
-                throw new OperationRejected();
+                throw new RequestRejected();
             }
             throw error;
         }
@@ -422,7 +434,7 @@ export class WalletInternal extends Wallet {
             const abortSignal = abortController.signal;
 
             // abort and retrack when order gets updated
-            this.addEventListener(WalletEventType.ORDER_UPDATED, event => {
+            this.addEventListener(OperatorEventType.ORDER_UPDATED, event => {
                 if (event.order.key == order.key) {
                     abortController.abort();
                     this.trackOrder(event.order as OrderInternal);
@@ -608,7 +620,7 @@ export class WalletInternal extends Wallet {
     }
 
     async * orders(abortSignal?: AbortSignal) {
-        for (const cachedOrder of await Cache.instance.getOrders(this._operator, abortSignal)) {
+        for (const cachedOrder of await Cache.instance.getOrders(this.operatorAddress, abortSignal)) {
             yield {
                 ...cachedOrder,
                 orderbook: await fetchOrderbook(cachedOrder.orderbook, abortSignal),
@@ -617,7 +629,7 @@ export class WalletInternal extends Wallet {
     }
 
     async * recentOrders(count: number, abortSignal?: AbortSignal) {
-        for (const cachedOrder of await Cache.instance.getRecentOrders(this._operator, count, abortSignal)) {
+        for (const cachedOrder of await Cache.instance.getRecentOrders(this.operatorAddress, count, abortSignal)) {
             yield {
                 ...cachedOrder,
                 orderbook: await fetchOrderbook(cachedOrder.orderbook, abortSignal),
@@ -626,7 +638,7 @@ export class WalletInternal extends Wallet {
     }
 
     async * openOrders(abortSignal?: AbortSignal) {
-        for (const cachedOrder of await Cache.instance.getOpenOrders(this._operator, abortSignal)) {
+        for (const cachedOrder of await Cache.instance.getOpenOrders(this.operatorAddress, abortSignal)) {
             yield {
                 ...cachedOrder,
                 orderbook: await fetchOrderbook(cachedOrder.orderbook, abortSignal),
@@ -635,7 +647,7 @@ export class WalletInternal extends Wallet {
     }
 
     async * closedOrders(abortSignal?: AbortSignal) {
-        for (const cachedOrder of await Cache.instance.getClosedOrders(this._operator, abortSignal)) {
+        for (const cachedOrder of await Cache.instance.getClosedOrders(this.operatorAddress, abortSignal)) {
             yield {
                 ...cachedOrder,
                 orderbook: await fetchOrderbook(cachedOrder.orderbook, abortSignal),
@@ -646,7 +658,7 @@ export class WalletInternal extends Wallet {
     private async createOrder(txHash: string, orderbook: Orderbook, type: OrderType, execution: OrderExecutionType, price: bigint, amount: bigint) {
         const order = updateOrderStatus({
             key: txHash,
-            owner: this._operator,
+            owner: this.operatorAddress,
             orderbook,
             txHash,
             id: 0n,
@@ -685,7 +697,7 @@ export class WalletInternal extends Wallet {
     }
 
     async buyAtMarket(orderbook: Orderbook, maxAmount: bigint, maxPrice: bigint, abortSignal?: AbortSignal) {
-        const operator = IOperatorV1.at(this._operator);
+        const operator = IOperatorV1.at(this.operatorAddress);
         const baseToken = IERC20.at(orderbook.baseToken.address);
         // TODO allow user to configure maxPricePoints
         const maxPricePoints = 255;
@@ -700,7 +712,7 @@ export class WalletInternal extends Wallet {
         } catch (error) {
             checkAbortSignal(abortSignal);
             if (isUserRejectionError(error)) {
-                throw new OperationRejected();
+                throw new RequestRejected();
             }
             throw error;
         }
@@ -708,7 +720,7 @@ export class WalletInternal extends Wallet {
     }
 
     async sellAtMarket(orderbook: Orderbook, maxAmount: bigint, minPrice: bigint, abortSignal?: AbortSignal) {
-        const operator = IOperatorV1.at(this._operator);
+        const operator = IOperatorV1.at(this.operatorAddress);
         const tradedToken = IERC20.at(orderbook.tradedToken.address);
         // TODO allow user to configure maxPricePoints
         const maxPricePoints = 255;
@@ -723,7 +735,7 @@ export class WalletInternal extends Wallet {
         } catch (error) {
             checkAbortSignal(abortSignal);
             if (isUserRejectionError(error)) {
-                throw new OperationRejected();
+                throw new RequestRejected();
             }
             throw error;
         }
@@ -731,7 +743,7 @@ export class WalletInternal extends Wallet {
     }
 
     async placeBuyOrder(orderbook: Orderbook, maxAmount: bigint, price: bigint, abortSignal?: AbortSignal) {
-        const operator = IOperatorV1.at(this._operator);
+        const operator = IOperatorV1.at(this.operatorAddress);
         const baseToken = IERC20.at(orderbook.baseToken.address);
         // TODO allow user to configure maxPricePoints
         const maxPricePoints = 255;
@@ -746,7 +758,7 @@ export class WalletInternal extends Wallet {
         } catch (error) {
             checkAbortSignal(abortSignal);
             if (isUserRejectionError(error)) {
-                throw new OperationRejected();
+                throw new RequestRejected();
             }
             throw error;
         }
@@ -754,7 +766,7 @@ export class WalletInternal extends Wallet {
     }
 
     async placeSellOrder(orderbook: Orderbook, maxAmount: bigint, price: bigint, abortSignal?: AbortSignal) {
-        const operator = IOperatorV1.at(this._operator);
+        const operator = IOperatorV1.at(this.operatorAddress);
         const tradedToken = IERC20.at(orderbook.tradedToken.address);
         // TODO allow user to configure maxPricePoints
         const maxPricePoints = 255;
@@ -769,7 +781,7 @@ export class WalletInternal extends Wallet {
         } catch (error) {
             checkAbortSignal(abortSignal);
             if (isUserRejectionError(error)) {
-                throw new OperationRejected();
+                throw new RequestRejected();
             }
             throw error;
         }
@@ -777,7 +789,7 @@ export class WalletInternal extends Wallet {
     }
 
     async claimOrder(order: OrderInternal, abortSignal?: AbortSignal) {
-        const operator = IOperatorV1.at(this._operator);
+        const operator = IOperatorV1.at(this.operatorAddress);
         const maxAmount = MAX_UINT32;
         try {
             const { orderbook, price, id } = order;
@@ -789,7 +801,7 @@ export class WalletInternal extends Wallet {
         } catch (error) {
             checkAbortSignal(abortSignal);
             if (isUserRejectionError(error)) {
-                throw new OperationRejected();
+                throw new RequestRejected();
             }
             throw error;
         }
@@ -797,7 +809,7 @@ export class WalletInternal extends Wallet {
     }
 
     async cancelOrder(order: OrderInternal, abortSignal?: AbortSignal) {
-        const operator = IOperatorV1.at(this._operator);
+        const operator = IOperatorV1.at(this.operatorAddress);
         // TODO allow user to configure maxLastOrderId
         const maxLastOrderId = MAX_UINT32;
         try {
@@ -810,7 +822,7 @@ export class WalletInternal extends Wallet {
         } catch (error) {
             checkAbortSignal(abortSignal);
             if (isUserRejectionError(error)) {
-                throw new OperationRejected();
+                throw new RequestRejected();
             }
             throw error;
         }
@@ -877,8 +889,8 @@ function updateOrderStatus(order: OrderInternal): OrderInternal {
 /**
  * Event dispatched from Wallet.
  */
-export abstract class WalletEvent extends Event {
-    constructor(type: WalletEventType) {
+export abstract class OperatorEvent extends Event {
+    constructor(type: OperatorEventType) {
         super(type);
     }
 }
@@ -886,45 +898,45 @@ export abstract class WalletEvent extends Event {
 /**
  * Event dispatched when an order is created.
  */
-export class OrderCreatedEvent extends WalletEvent {
+export class OrderCreatedEvent extends OperatorEvent {
     constructor(readonly order: Order) {
-        super(WalletEventType.ORDER_CREATED);
+        super(OperatorEventType.ORDER_CREATED);
     }
 }
 
 /**
  * Event dispatched when an order is updated.
  */
-export class OrderUpdatedEvent extends WalletEvent {
+export class OrderUpdatedEvent extends OperatorEvent {
     constructor(readonly order: Order) {
-        super(WalletEventType.ORDER_UPDATED);
+        super(OperatorEventType.ORDER_UPDATED);
     }
 }
 
 /**
  * Event dispatched when an order is removed.
  */
-export class OrderRemovedEvent extends WalletEvent {
+export class OrderRemovedEvent extends OperatorEvent {
     constructor(readonly order: Order) {
-        super(WalletEventType.ORDER_REMOVED);
+        super(OperatorEventType.ORDER_REMOVED);
     }
 }
 
 /**
  * Event dispatched when tokens have been deposited into the operator.
  */
-export class TokenDepositedEvent extends WalletEvent {
+export class TokenDepositedEvent extends OperatorEvent {
     constructor(readonly token: Token, readonly amount: bigint) {
-        super(WalletEventType.TOKEN_DEPOSITED);
+        super(OperatorEventType.TOKEN_DEPOSITED);
     }
 }
 
 /**
  * Event dispatched when tokens have been withdrawn from the operator.
  */
-export class TokenWithdrawnEvent extends WalletEvent {
+export class TokenWithdrawnEvent extends OperatorEvent {
     constructor(readonly token: Token, readonly amount: bigint) {
-        super(WalletEventType.TOKEN_WITHDRAWN);
+        super(OperatorEventType.TOKEN_WITHDRAWN);
     }
 }
 
@@ -939,23 +951,22 @@ export class PermissionToWalletRequired extends Error {
 }
 
 /**
- * Error thrown when the user rejected the request to connect the wallet.
+ * Error thrown when the user rejected the request.
  */
-export class WalletConnectionRejected extends Error {
+export class RequestRejected extends Error {
     constructor() {
-        super('Wallet Connection Rejected');
-        this.name = 'WalletConnectionRejected';
+        super('Request Rejected');
+        this.name = 'RequestRejected';
     }
 }
 
 /**
- * Error thrown when trying to access the wallet singleton instance before it is
- * connected.
+ * Error thrown when trying to access the operator before it is connected.
  */
-export class WalletNotConnected extends Error {
+export class OperatorNotConnected extends Error {
     constructor() {
-        super('Wallet Not Connected');
-        this.name = 'WalletNotConnected';
+        super('Operator Not Connected');
+        this.name = 'OperatorNotConnected';
     }
 }
 
@@ -972,42 +983,22 @@ export class WalletAddressNotFound extends Error {
 }
 
 /**
- * Error thrown when the user needs to register.
+ * Error thrown when the operator has not been created yet.
  */
-export class RegisterRequired extends Error {
+export class OperatorNotCreated extends Error {
     constructor() {
-        super('Register Required');
-        this.name = 'RegisterRequired';
+        super('Operator Not Created');
+        this.name = 'OperatorNotCreated';
     }
 }
 
 /**
- * Error thrown when the user is already registered.
+ * Error thrown when the operator has been created already.
  */
-export class AlreadyRegistered extends Error {
+export class OperatorAlreadyCreated extends Error {
     constructor() {
-        super('Already Registered');
-        this.name = 'AlreadyRegistered';
-    }
-}
-
-/**
- * Error thrown when the user rejects the request to create the operator.
- */
-export class RegisterRejected extends Error {
-    constructor() {
-        super('Register Rejected');
-        this.name = 'RegisterRejected';
-    }
-}
-
-/**
- * Error thrown when the user rejected the request to execute an operation.
- */
-export class OperationRejected extends Error {
-    constructor() {
-        super('Operation Rejected');
-        this.name = 'OperationRejected';
+        super('Operator Already Created');
+        this.name = 'OperatorAlreadyCreated';
     }
 }
 

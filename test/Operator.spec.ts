@@ -1,9 +1,8 @@
 import { Transaction } from '@frugal-wizard/abi2ts-lib';
 import { expect, use } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
-import { Chain, Order, Orderbook, OrderbookDEX, Token, UserData, Wallet, WalletEventType } from '../src';
+import { Chain, Order, Orderbook, OrderbookDEX, Token, UserData, Operator, OperatorEventType } from '../src';
 import { Cache } from '../src/Cache';
-import { WalletInternal } from '../src/Wallet';
 import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-provider';
 import { resetIndexedDB } from './indexeddb';
 import { setUpSmartContracts } from './smart-contracts';
@@ -12,7 +11,7 @@ import { asyncFirst, asyncToArray } from './utils';
 
 use(chaiAsPromised);
 
-describe('Wallet', function() {
+describe('Operator', function() {
     beforeEach(async function() {
         await setUpEthereumProvider(true);
         await Chain.connect();
@@ -22,7 +21,7 @@ describe('Wallet', function() {
     });
 
     afterEach(async function() {
-        Wallet.disconnect();
+        Operator.disconnect();
         UserData.unload();
         OrderbookDEX.disconnect();
         Chain.disconnect();
@@ -30,26 +29,26 @@ describe('Wallet', function() {
         resetIndexedDB();
     });
 
-    describe('register', function() {
-        it('should register', async function() {
-            await Wallet.register();
+    describe('create', function() {
+        it('should create', async function() {
+            await Operator.create();
         });
     });
 
     describe('connect', function() {
         beforeEach(async function() {
-            await Wallet.register();
-            Wallet.disconnect();
+            await Operator.create();
+            Operator.disconnect();
         });
 
         it('should connect', async function() {
-            await Wallet.connect();
+            await Operator.connect();
         });
     });
 
-    describe('wallet operations', function() {
+    describe('operator operations', function() {
         beforeEach(async function() {
-            await Wallet.register();
+            await Operator.create();
         });
 
         // TODO thoroughly test wallet operations
@@ -57,29 +56,29 @@ describe('Wallet', function() {
         describe('deposit', function() {
             it('should work', async function() {
                 const token = await asyncFirst(UserData.instance.trackedTokens()) as Token;
-                await Wallet.instance.deposit(token, 1n);
+                await Operator.instance.deposit(token, 1n);
             });
         });
 
         describe('withdraw', function() {
             beforeEach(async function() {
                 const token = await asyncFirst(UserData.instance.trackedTokens()) as Token;
-                await Wallet.instance.deposit(token, 1n);
+                await Operator.instance.deposit(token, 1n);
             });
 
             it('should work', async function() {
                 const token = await asyncFirst(UserData.instance.trackedTokens()) as Token;
-                await Wallet.instance.withdraw(token, 1n);
+                await Operator.instance.withdraw(token, 1n);
             });
         });
     });
 
     describe('trade operations', function() {
         beforeEach(async function() {
-            await Wallet.register();
+            await Operator.create();
             const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
-            await Wallet.instance.deposit(orderbook.tradedToken, orderbook.contractSize);
-            await Wallet.instance.deposit(orderbook.baseToken, orderbook.priceTick);
+            await Operator.instance.deposit(orderbook.tradedToken, orderbook.contractSize);
+            await Operator.instance.deposit(orderbook.baseToken, orderbook.priceTick);
         });
 
         // TODO thoroughly test trade operations
@@ -87,35 +86,35 @@ describe('Wallet', function() {
         describe('buyAtMarket', function() {
             it('should work', async function() {
                 const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
-                await Wallet.instance.buyAtMarket(orderbook, 1n, orderbook.priceTick);
+                await Operator.instance.buyAtMarket(orderbook, 1n, orderbook.priceTick);
             });
         });
 
         describe('sellAtMarket', function() {
             it('should work', async function() {
                 const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
-                await Wallet.instance.sellAtMarket(orderbook, 1n, orderbook.priceTick);
+                await Operator.instance.sellAtMarket(orderbook, 1n, orderbook.priceTick);
             });
         });
 
         describe('placeBuyOrder', function() {
             it('should work', async function() {
                 const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
-                await Wallet.instance.placeBuyOrder(orderbook, 1n, orderbook.priceTick);
+                await Operator.instance.placeBuyOrder(orderbook, 1n, orderbook.priceTick);
             });
         });
 
         describe('placeSellOrder', function() {
             it('should work', async function() {
                 const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
-                await Wallet.instance.placeSellOrder(orderbook, 1n, orderbook.priceTick);
+                await Operator.instance.placeSellOrder(orderbook, 1n, orderbook.priceTick);
             });
         });
     });
 
     describe('order operations', function() {
         beforeEach(async function() {
-            await Wallet.register();
+            await Operator.create();
             setUpTimeMock();
         });
 
@@ -128,27 +127,27 @@ describe('Wallet', function() {
         describe('dismissOrder', function() {
             beforeEach(async function() {
                 const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
-                await Wallet.instance.deposit(orderbook.tradedToken, orderbook.contractSize);
-                await Wallet.instance.deposit(orderbook.baseToken, orderbook.priceTick);
-                await Wallet.instance.placeSellOrder(orderbook, 1n, orderbook.priceTick);
+                await Operator.instance.deposit(orderbook.tradedToken, orderbook.contractSize);
+                await Operator.instance.deposit(orderbook.baseToken, orderbook.priceTick);
+                await Operator.instance.placeSellOrder(orderbook, 1n, orderbook.priceTick);
                 await waitForOrdersPendingTransactions();
                 increaseTime(1);
-                await Wallet.instance.buyAtMarket(orderbook, 1n, orderbook.priceTick);
+                await Operator.instance.buyAtMarket(orderbook, 1n, orderbook.priceTick);
                 await waitForOrdersPendingTransactions();
             });
 
             it('should remove the order', async function() {
-                const order = await asyncFirst(Wallet.instance.orders()) as Order;
-                await Wallet.instance.dismissOrder(order);
-                expect((await asyncToArray(Wallet.instance.orders())).find(({ key }) => key == order.key))
+                const order = await asyncFirst(Operator.instance.orders()) as Order;
+                await Operator.instance.dismissOrder(order);
+                expect((await asyncToArray(Operator.instance.orders())).find(({ key }) => key == order.key))
                     .to.be.undefined;
             });
 
             it('should dispatch an OrderRemovedEvent', async function() {
                 let removedOrder: Order | undefined;
-                Wallet.instance.addEventListener(WalletEventType.ORDER_REMOVED, ({ order }) => removedOrder = order);
-                const order = await asyncFirst(Wallet.instance.orders()) as Order;
-                await Wallet.instance.dismissOrder(order);
+                Operator.instance.addEventListener(OperatorEventType.ORDER_REMOVED, ({ order }) => removedOrder = order);
+                const order = await asyncFirst(Operator.instance.orders()) as Order;
+                await Operator.instance.dismissOrder(order);
                 expect(removedOrder?.key)
                     .to.be.equal(order.key);
             });
@@ -158,7 +157,7 @@ describe('Wallet', function() {
 
 async function waitForOrdersPendingTransactions() {
     const pending: Promise<Transaction>[] = [];
-    for (const order of await Cache.instance.getOpenOrders(WalletInternal.instance._operator)) {
+    for (const order of await Cache.instance.getOpenOrders(Operator.instance.operatorAddress)) {
         if (order.txHash) {
             pending.push(Transaction.get(order.txHash));
         }

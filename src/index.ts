@@ -30,9 +30,8 @@ export {
 } from './UserData';
 export { APIEvents, APIEventType, APIEvent, WalletConnectedEvent } from './APIEvents';
 export {
-    Wallet, PermissionToWalletRequired, WalletConnectionRejected,
-    WalletNotConnected, WalletAddressNotFound, RegisterRequired,
-    AlreadyRegistered, RegisterRejected, OperationRejected, WalletEventType,
-    WalletEvent, OrderCreatedEvent, OrderUpdatedEvent, TokenBalance,
-    TokenDepositedEvent, TokenWithdrawnEvent, InsufficientFunds
-} from './Wallet';
+    Operator, PermissionToWalletRequired, RequestRejected, OperatorNotConnected,
+    WalletAddressNotFound, OperatorNotCreated, OperatorAlreadyCreated,
+    OperatorEventType, OperatorEvent, OrderCreatedEvent, OrderUpdatedEvent,
+    TokenBalance, TokenDepositedEvent, TokenWithdrawnEvent, InsufficientFunds
+} from './Operator';
