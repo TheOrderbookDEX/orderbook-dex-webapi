@@ -4,9 +4,10 @@ import { OperatorFactory } from '@theorderbookdex/orderbook-dex-operator/dist/Op
 import { OrderbookFactoryV1 } from '@theorderbookdex/orderbook-dex-v1/dist/OrderbookFactoryV1';
 import { IOrderbookV1 } from '@theorderbookdex/orderbook-dex-v1/dist/interfaces/IOrderbookV1';
 import { IERC20 } from '@theorderbookdex/orderbook-dex/dist/interfaces/IERC20';
-import { createSigner, getAccounts, getBalance, getBlockTimestamp, hexstring, Signer } from '@frugal-wizard/abi2ts-lib';
+import { createSigner, getAccounts, getBalance, getBlockNumber, getBlockTimestamp, hexstring, Signer } from '@frugal-wizard/abi2ts-lib';
 import { EthereumProvider } from 'ganache';
 import { OperatorV1 } from '@theorderbookdex/orderbook-dex-v1-operator/dist/OperatorV1';
+import { Address, ZERO_ADDRESS } from '../src';
 
 interface Global {
     ethereum?: EthereumProvider;
@@ -14,35 +15,84 @@ interface Global {
 
 const global = globalThis as Global;
 
+export type TradedTokenSymbol = 'WBTC' | 'WETH' | 'BNB' | 'WXRP';
+export type BaseTokenSymbol = 'USDT';
+export type TokenSymbol = TradedTokenSymbol | BaseTokenSymbol;
+export type OrderbookPair = `${TradedTokenSymbol}/${BaseTokenSymbol}`;
+
+export interface TestContracts {
+    addressBook: Address;
+    operatorFactory: Address;
+    operatorV1: Address;
+    orderbookFactory: Address;
+    tokens: Record<TokenSymbol, Address>;
+    orderbooks: Record<OrderbookPair, { address: Address, blockNumber: number }>;
+}
+
+export const testContracts: TestContracts = {
+    addressBook:      ZERO_ADDRESS,
+    operatorFactory:  ZERO_ADDRESS,
+    operatorV1:       ZERO_ADDRESS,
+    orderbookFactory: ZERO_ADDRESS,
+    tokens: {
+        WBTC: ZERO_ADDRESS,
+        WETH: ZERO_ADDRESS,
+        BNB:  ZERO_ADDRESS,
+        WXRP: ZERO_ADDRESS,
+        USDT: ZERO_ADDRESS,
+    },
+    orderbooks: {
+        'WBTC/USDT': { address: ZERO_ADDRESS, blockNumber: 0 },
+        'WETH/USDT': { address: ZERO_ADDRESS, blockNumber: 0 },
+        'BNB/USDT':  { address: ZERO_ADDRESS, blockNumber: 0 },
+        'WXRP/USDT': { address: ZERO_ADDRESS, blockNumber: 0 },
+    },
+}
+
 export async function setUpSmartContracts() {
     const signer = await createSigner('0x0000000000000000000000000000000000000000000000000000000000000001');
     await global.ethereum?.send('evm_setAccountBalance', [ signer.address, hexstring(1000000000000000000000n) ]);
-    const addressBook      = (await signer.sendTransaction(await AddressBook.populateTransaction.deploy())).contractAddress;
-    const operatorFactory  = (await signer.sendTransaction(await OperatorFactory.populateTransaction.deploy(signer.address, addressBook))).contractAddress;
-    const operatorV1       = (await signer.sendTransaction(await OperatorV1.populateTransaction.deploy())).contractAddress;
-    const orderbookFactory = (await signer.sendTransaction(await OrderbookFactoryV1.populateTransaction.deploy(addressBook))).contractAddress;
-    const WBTC             = (await signer.sendTransaction(await ERC20Mock.populateTransaction.deploy('Wrapped BTC', 'WBTC', 18))).contractAddress;
-    const WETH             = (await signer.sendTransaction(await ERC20Mock.populateTransaction.deploy('Wrapped Ether', 'WETH', 18))).contractAddress;
-    const BNB              = (await signer.sendTransaction(await ERC20Mock.populateTransaction.deploy('BNB', 'BNB', 18))).contractAddress;
-    const WXRP             = (await signer.sendTransaction(await ERC20Mock.populateTransaction.deploy('Wrapped XRP', 'WXRP', 18))).contractAddress;
-    const USDT             = (await signer.sendTransaction(await ERC20Mock.populateTransaction.deploy('Tether USD', 'USDT', 6))).contractAddress;
-    await signer.sendTransaction(await OrderbookFactoryV1.at(orderbookFactory).populateTransaction.createOrderbook(WBTC, USDT, 1000000000000000n, 100000000n));
-    await signer.sendTransaction(await OrderbookFactoryV1.at(orderbookFactory).populateTransaction.createOrderbook(WETH, USDT, 10000000000000000n, 10000000n));
-    await signer.sendTransaction(await OrderbookFactoryV1.at(orderbookFactory).populateTransaction.createOrderbook(BNB,  USDT, 100000000000000000n, 1000000n));
-    await signer.sendTransaction(await OrderbookFactoryV1.at(orderbookFactory).populateTransaction.createOrderbook(WXRP, USDT, 1000000000000000000n,  10000n));
-    await signer.sendTransaction(await OperatorFactory.at(operatorFactory).populateTransaction.registerVersion(10000n, operatorV1));
+
+    testContracts.addressBook      = (await signer.sendTransaction(await AddressBook.populateTransaction.deploy())).contractAddress as Address;
+    testContracts.operatorFactory  = (await signer.sendTransaction(await OperatorFactory.populateTransaction.deploy(signer.address, testContracts.addressBook))).contractAddress as Address;
+    testContracts.operatorV1       = (await signer.sendTransaction(await OperatorV1.populateTransaction.deploy())).contractAddress as Address;
+    testContracts.orderbookFactory = (await signer.sendTransaction(await OrderbookFactoryV1.populateTransaction.deploy(testContracts.addressBook))).contractAddress as Address;
+
+    testContracts.tokens.WBTC = (await signer.sendTransaction(await ERC20Mock.populateTransaction.deploy('Wrapped BTC', 'WBTC', 18))).contractAddress as Address;
+    testContracts.tokens.WETH = (await signer.sendTransaction(await ERC20Mock.populateTransaction.deploy('Wrapped Ether', 'WETH', 18))).contractAddress as Address;
+    testContracts.tokens.BNB  = (await signer.sendTransaction(await ERC20Mock.populateTransaction.deploy('BNB', 'BNB', 18))).contractAddress as Address;
+    testContracts.tokens.WXRP = (await signer.sendTransaction(await ERC20Mock.populateTransaction.deploy('Wrapped XRP', 'WXRP', 18))).contractAddress as Address;
+    testContracts.tokens.USDT = (await signer.sendTransaction(await ERC20Mock.populateTransaction.deploy('Tether USD', 'USDT', 6))).contractAddress as Address;
+
+    await setUpOrderbook(signer, 'WBTC/USDT', 1000000000000000n, 100000000n);
+    await setUpOrderbook(signer, 'WETH/USDT', 10000000000000000n, 10000000n);
+    await setUpOrderbook(signer, 'BNB/USDT',  100000000000000000n, 1000000n);
+    await setUpOrderbook(signer, 'WXRP/USDT', 1000000000000000000n,  10000n);
+
+    await signer.sendTransaction(await OperatorFactory.at(testContracts.operatorFactory).populateTransaction.registerVersion(10000n, testContracts.operatorV1));
+}
+
+async function setUpOrderbook(signer: Signer, pair: OrderbookPair, contractSize: bigint, priceTick: bigint) {
+    const { orderbookFactory, tokens } = testContracts;
+    const [ tradedToken, baseToken ] = (pair.split('/') as TokenSymbol[]).map(symbol => tokens[symbol]);
+    const address = await OrderbookFactoryV1.at(orderbookFactory).callStatic.createOrderbook(tradedToken, baseToken, contractSize, priceTick, { from: signer.address }) as Address;
+    await signer.sendTransaction(await OrderbookFactoryV1.at(orderbookFactory).populateTransaction.createOrderbook(tradedToken, baseToken, contractSize, priceTick));
+    const blockNumber = await getBlockNumber();
+    testContracts.orderbooks[pair] = { address, blockNumber };
 }
 
 export async function createAuxSigner() {
     const signer = await createSigner('0x0000000000000000000000000000000000000000000000000000000000000003');
     if (!await getBalance(signer.address)) {
         await global.ethereum?.send('evm_setAccountBalance', [ signer.address, hexstring(1000000000000000000000n) ]);
-        await signer.sendTransaction(await ERC20Mock.at('0xB9816fC57977D5A786E654c7CF76767be63b966e').populateTransaction.giveMe(1000000000000000000000n));
-        await signer.sendTransaction(await ERC20Mock.at('0x6D411e0A54382eD43F02410Ce1c7a7c122afA6E1').populateTransaction.giveMe(1000000000000000000000n));
-        await signer.sendTransaction(await ERC20Mock.at('0x5CF7F96627F3C9903763d128A1cc5D97556A6b99').populateTransaction.giveMe(1000000000000000000000n));
-        await signer.sendTransaction(await ERC20Mock.at('0xA3183498b579bd228aa2B62101C40CC1da978F24').populateTransaction.giveMe(1000000000000000000000n));
-        await signer.sendTransaction(await ERC20Mock.at('0x63f58053c9499E1104a6f6c6d2581d6D83067EEB').populateTransaction.giveMe(1000000000000n));
-        await signer.sendTransaction(await AddressBook.at('0xF2E246BB76DF876Cef8b38ae84130F4F55De395b').populateTransaction.register());
+
+        const { addressBook, tokens } = testContracts;
+        await signer.sendTransaction(await ERC20Mock.at(tokens.WBTC).populateTransaction.giveMe(1000000000000000000000n));
+        await signer.sendTransaction(await ERC20Mock.at(tokens.WETH).populateTransaction.giveMe(1000000000000000000000n));
+        await signer.sendTransaction(await ERC20Mock.at(tokens.BNB ).populateTransaction.giveMe(1000000000000000000000n));
+        await signer.sendTransaction(await ERC20Mock.at(tokens.WXRP).populateTransaction.giveMe(1000000000000000000000n));
+        await signer.sendTransaction(await ERC20Mock.at(tokens.USDT).populateTransaction.giveMe(1000000000000n));
+        await signer.sendTransaction(await AddressBook.at(addressBook).populateTransaction.register());
     }
     return signer;
 }

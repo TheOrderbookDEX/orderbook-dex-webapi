@@ -20,6 +20,12 @@ export async function asyncCatchError<T>(promise: Promise<T>, error: { new (): E
     }
 }
 
+export async function asyncFirst<T>(iterable: AsyncIterable<T>): Promise<T | undefined> {
+    for await (const item of iterable) {
+        return item;
+    }
+}
+
 export function max<T>(a: T, b: T): T {
     return a > b ? a : b;
 }

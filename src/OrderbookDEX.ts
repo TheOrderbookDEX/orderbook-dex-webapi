@@ -172,6 +172,7 @@ export class ChainNotSupported extends Error {
 
 interface OrderbookDEXChainConfig {
     readonly operatorFactory: Address;
+    readonly operatorV1: Address;
     readonly orderbookFactoryV1: Address;
     readonly orderbooks: Address[];
 }
@@ -180,6 +181,7 @@ export const orderbookDEXChainConfigs: { [chainId: number]: OrderbookDEXChainCon
 
 orderbookDEXChainConfigs[5] = {
     operatorFactory: '0x7BF5889661f06B7d287C6acBA754d318F17E4A52' as Address,
+    operatorV1: '0x0000000000000000000000000000000000000000' as Address,
     orderbookFactoryV1: '0xdFbd8e2360B96C0bd4A00d4D1271A33f0C6E75C7' as Address,
     orderbooks: [
         '0x24C2d6AA89b3DCC86a4d75cc85727136C5d5872f' as Address, // WBTC/USDC
@@ -189,6 +191,7 @@ orderbookDEXChainConfigs[5] = {
 
 orderbookDEXChainConfigs[1337] = {
     operatorFactory: '0x2946259E0334f33A064106302415aD3391BeD384' as Address,
+    operatorV1: '0xDe09E74d4888Bc4e65F589e8c13Bce9F71DdF4c7' as Address,
     orderbookFactoryV1: '0x51a240271AB8AB9f9a21C82d9a85396b704E164d' as Address,
     orderbooks: [
         '0x3E920B0890189806A99451699e4e531E81035BA6' as Address,

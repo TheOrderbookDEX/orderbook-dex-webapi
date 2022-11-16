@@ -1,11 +1,11 @@
 import { IOrderbookV1 } from '@theorderbookdex/orderbook-dex-v1/dist/interfaces/IOrderbookV1';
-import { IOrderbookFactoryV1 } from '@theorderbookdex/orderbook-dex-v1/dist/interfaces/IOrderbookFactoryV1';
+import { IOrderbookFactoryV1, OrderbookCreated } from '@theorderbookdex/orderbook-dex-v1/dist/interfaces/IOrderbookFactoryV1';
 import { IOrderbook } from '@theorderbookdex/orderbook-dex/dist/interfaces/IOrderbook';
 import { Address } from './Address';
 import { Cache } from './Cache';
 import { OrderbookDEXInternal } from './OrderbookDEX';
 import { fetchToken, Token } from './Token';
-import { asyncCatchError, checkAbortSignal } from './utils';
+import { asyncCatchError, asyncFirst, checkAbortSignal } from './utils';
 import { PriceHistory, PriceHistoryInternal, TimeFrame } from './PriceHistory';
 import { PricePoints, PricePointsInternal } from './PricePoints';
 import { PriceTicker, PriceTickerInternal } from './PriceTicker';
@@ -147,8 +147,7 @@ export async function fetchOrderbook(address: Address, abortSignal?: AbortSignal
                 checkAbortSignal(abortSignal);
                 const priceTick = await asyncCatchError(contract.priceTick(), NotAnOrderbook);
                 checkAbortSignal(abortSignal);
-                const orderbookFactory = IOrderbookFactoryV1.at(OrderbookDEXInternal.instance._config.orderbookFactoryV1);
-                const creationBlockNumber = Number(await asyncCatchError(orderbookFactory.blockNumber(address), NotAnOrderbook));
+                const creationBlockNumber = await fetchOrderbookCreationBlockNumber(address);
                 checkAbortSignal(abortSignal);
                 await Cache.instance.saveOrderbook({
                     address, version, tradedToken: tradedToken.address, baseToken: baseToken.address, contractSize, priceTick, creationBlockNumber
@@ -160,6 +159,14 @@ export async function fetchOrderbook(address: Address, abortSignal?: AbortSignal
             }
         }
     }
+}
+
+export async function fetchOrderbookCreationBlockNumber(orderbook: Address): Promise<number> {
+    const orderbookFactory = IOrderbookFactoryV1.at(OrderbookDEXInternal.instance._config.orderbookFactoryV1);
+    // TODO fix in abi2ts-lib: 0 should be default value for fromBlock
+    const event = await asyncFirst(OrderbookCreated.get({ address: orderbookFactory.address, orderbook, fromBlock: 0 }));
+    if (!event) throw new NotAnOrderbook();
+    return event.blockNumber;
 }
 
 /**
