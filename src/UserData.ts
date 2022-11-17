@@ -124,9 +124,15 @@ export class UserDataInternal extends UserData {
     static async load(): Promise<UserDataInternal> {
         if (!this._instance) {
             const chainId = Chain.instance.chainId;
-            const db = await openDB<UserDataDBV1>(`UserData${chainId}`, 1, {
-                async upgrade(db, version) {
-                    if (version < 1) {
+            const db = await openDB<UserDataDBV1>(`UserData${chainId}`, 2, {
+                async upgrade(db, oldVersion, newVersion: number) {
+                    if (oldVersion < 2) {
+                        const olddb = db as IDBPDatabase;
+                        for (const name of olddb.objectStoreNames) {
+                            olddb.deleteObjectStore(name);
+                        }
+                    }
+                    if (newVersion >= 2) {
                         const trackedTokens = db.createObjectStore('trackedTokens', {
                             keyPath: 'address',
                         });
