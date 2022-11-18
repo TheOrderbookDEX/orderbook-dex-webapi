@@ -6,6 +6,8 @@ import { fetchOrderbook, Orderbook } from './Orderbook';
 import { fetchToken, Token } from './Token';
 import { checkAbortSignal } from './utils';
 
+// TODO move all UserData functionality to OrderbookDEX
+
 export enum UserDataEventType {
     /**
      * Event type dispatched when a token has been added to the list of tracked tokens.

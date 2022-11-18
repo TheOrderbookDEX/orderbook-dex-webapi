@@ -3,6 +3,9 @@ import { Address } from './Address';
 import { OrderExecutionType, OrderStatus, OrderType } from './Order';
 import { checkAbortSignal } from './utils';
 
+// TODO rename Cache to Database and related types accordingly
+// TODO move UserData persisted data here
+
 export class Cache {
     private static _instance?: Cache;
 
@@ -25,9 +28,10 @@ export class Cache {
                         db.createObjectStore('tokens', {
                             keyPath: 'address',
                         });
-                        db.createObjectStore('orderbooks', {
+                        const orderbooks = db.createObjectStore('orderbooks', {
                             keyPath: 'address',
                         });
+                        orderbooks.createIndex('byFactoryIndex', ['factory', 'factoryIndex'], { unique: true });
                         db.createObjectStore('priceHistoryRanges', {
                             keyPath: ['orderbook', 'toBlock'],
                         });
@@ -90,6 +94,29 @@ export class Cache {
         checkAbortSignal(abortSignal);
     }
 
+    static readonly GET_ORDERBOOKS_BATCH = 10;
+
+    async * getOrderbooks(factory: Address, abortSignal?: AbortSignal) {
+        const lastIndex = await this.getLastFactoryIndex(factory, abortSignal);
+        if (!lastIndex) return;
+        // due to how indexeddb works, we first fetch a batch then yield it
+        for (let index = 0; index <= lastIndex; index += Cache.GET_ORDERBOOKS_BATCH) {
+            const query = IDBKeyRange.bound([factory, index], [factory, index + Cache.GET_ORDERBOOKS_BATCH - 1]);
+            const orderbooks = await this._db.getAllFromIndex('orderbooks', 'byFactoryIndex', query);
+            checkAbortSignal(abortSignal);
+            for (const orderbook of orderbooks) {
+                yield orderbook;
+            }
+        }
+    }
+
+    async getLastFactoryIndex(factory: Address, abortSignal?: AbortSignal) {
+        const query = IDBKeyRange.bound([factory, Number.NEGATIVE_INFINITY], [factory, Number.POSITIVE_INFINITY]);
+        const cursor = await this._db.transaction('orderbooks').store.index('byFactoryIndex').openCursor(query, 'prev');
+        checkAbortSignal(abortSignal);
+        return cursor?.value.factoryIndex;
+    }
+
     async getOrderbook(address: Address, abortSignal?: AbortSignal) {
         checkAbortSignal(abortSignal);
         const orderbook = await this._db.get('orderbooks', address);
@@ -102,11 +129,13 @@ export class Cache {
         const {
             address,
             version,
+            tradedToken,
+            baseToken,
             contractSize,
             priceTick,
             creationBlockNumber,
-            tradedToken,
-            baseToken,
+            factory,
+            factoryIndex,
         } = orderbook;
         await this._db.put('orderbooks', {
             address,
@@ -116,6 +145,8 @@ export class Cache {
             contractSize,
             priceTick,
             creationBlockNumber,
+            factory,
+            factoryIndex,
         });
         checkAbortSignal(abortSignal);
     }
@@ -293,6 +324,8 @@ export interface CachedOrderbook {
     contractSize: bigint;
     priceTick: bigint;
     creationBlockNumber: number;
+    factory?: Address;
+    factoryIndex?: number;
 }
 
 export interface CachedPriceHistoryRange {
@@ -349,6 +382,12 @@ interface CacheV3 extends DBSchema {
     orderbooks: {
         key: CachedOrderbook['address'];
         value: CachedOrderbook;
+        indexes: {
+            byFactoryIndex: [
+                NonNullable<CachedOrderbook['factory']>,
+                NonNullable<CachedOrderbook['factoryIndex']>,
+            ];
+        };
     },
     priceHistoryRanges: {
         key: [

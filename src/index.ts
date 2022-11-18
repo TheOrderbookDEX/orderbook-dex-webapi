@@ -5,7 +5,8 @@ export {
 export { Chain, ChainConnectionFailed, ChainNotConnected } from './Chain';
 export {
     OrderbookDEX, ChainNotSupported, OrderbookDEXNotConnected,
-    OrderbookDEXEventType, OrderbookDEXEvent, OrderbookAddedEvent
+    OrderbookDEXEventType, OrderbookDEXEvent, OrderbookAddedEvent,
+    OrderbookFilter
 } from './OrderbookDEX';
 export { Address, ZERO_ADDRESS, isAddress } from './Address';
 export {

@@ -1,6 +1,6 @@
 import { use, expect } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
-import { fetchOrderbookCreationBlockNumber } from '../src/Orderbook';
+import { fetchOrderbookData } from '../src/Orderbook';
 import { Chain } from '../src/Chain';
 import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-provider';
 import { resetIndexedDB } from './indexeddb';
@@ -9,7 +9,7 @@ import { OrderbookDEX } from '../src/OrderbookDEX';
 
 use(chaiAsPromised);
 
-describe('fetchOrderbookCreationBlockNumber', function() {
+describe('fetchOrderbookData', function() {
     beforeEach(async function() {
         await setUpEthereumProvider();
         await Chain.connect();
@@ -25,10 +25,12 @@ describe('fetchOrderbookCreationBlockNumber', function() {
     });
 
     for (const pair in testContracts.orderbooks) {
-        describe(`fetching creation block number for ${pair}`, function() {
+        describe(`fetching orderbook data for ${pair}`, function() {
+            // TODO test other orderbook data
+
             it('should return expected block number', async function() {
-                const blockNumber = await fetchOrderbookCreationBlockNumber(testContracts.orderbooks[pair as OrderbookPair].address);
-                expect(blockNumber)
+                const { creationBlockNumber } = await fetchOrderbookData(testContracts.orderbooks[pair as OrderbookPair].address);
+                expect(creationBlockNumber)
                     .to.be.equal(testContracts.orderbooks[pair as OrderbookPair].blockNumber);
             });
         });

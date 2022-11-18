@@ -1,7 +1,7 @@
 import { Address } from './Address';
 import { Chain } from './Chain';
 import { GenericEventListener } from './event-types';
-import { fetchOrderbook, Orderbook } from './Orderbook';
+import { fetchOrderbooksData, Orderbook, OrderbookInternal } from './Orderbook';
 import { fetchToken, Token } from './Token';
 
 export enum OrderbookDEXEventType {
@@ -54,18 +54,15 @@ export abstract class OrderbookDEX extends EventTarget {
     abstract getToken(address: Address, abortSignal?: AbortSignal): Promise<Token>;
 
     /**
-     * Get all the orderbooks.
+     * Get the orderbooks.
      *
-     * Actually, not all orderbooks are returned, just those that match the user's
-     * tracked tokens.
+     * Orderbooks that don't match the user's tracked tokens are not returned.
      *
-     * This is temporary until we figure out a better way to handle the search
-     * feature in the UI.
-     *
+     * @param filter A filter that orderbooks returned must match.
      * @param abortSignal A signal to abort the operation.
      * @returns The orderbooks.
      */
-    abstract getOrderbooks(abortSignal?: AbortSignal): AsyncIterable<Orderbook>;
+    abstract getOrderbooks(filter: OrderbookFilter, abortSignal?: AbortSignal): AsyncIterable<Orderbook>;
 
     addEventListener(type: OrderbookDEXEventType.ORDERBOOK_ADDED, callback: GenericEventListener<OrderbookAddedEvent> | null, options?: boolean | AddEventListenerOptions): void;
     addEventListener(type: OrderbookDEXEventType, callback: GenericEventListener<OrderbookDEXEvent> | null, options?: boolean | AddEventListenerOptions): void {
@@ -85,6 +82,26 @@ export abstract class OrderbookDEX extends EventTarget {
     protected constructor() {
         super();
     }
+}
+
+/**
+ * Filter which orderbooks are retrieved.
+ */
+export interface OrderbookFilter {
+    /**
+     * Whether to retrieve saved orderbooks only.
+     */
+    saved?: boolean;
+
+    /**
+     * Retrieve only orderbooks matching this traded token.
+     */
+    tradedToken?: Address;
+
+    /**
+     * Retrieve only orderbooks matching this base token.
+     */
+    baseToken?: Address;
 }
 
 export class OrderbookDEXInternal extends OrderbookDEX {
@@ -120,10 +137,17 @@ export class OrderbookDEXInternal extends OrderbookDEX {
         return await fetchToken(address, abortSignal);
     }
 
-    async * getOrderbooks(abortSignal?: AbortSignal): AsyncIterable<Orderbook> {
-        // TODO hardcoded
-        for (const address of this._config.orderbooks) {
-            yield await fetchOrderbook(address, abortSignal);
+    async * getOrderbooks(filter: OrderbookFilter, abortSignal?: AbortSignal): AsyncIterable<Orderbook> {
+        // TODO filter saved orderbooks
+        // TODO filter out orderbooks with tokens not matching tracked tokens
+        for await (const orderbookData of fetchOrderbooksData(abortSignal)) {
+            if (filter.tradedToken && filter.tradedToken != orderbookData.tradedToken) continue;
+            if (filter.baseToken && filter.baseToken != orderbookData.baseToken) continue;
+            yield new OrderbookInternal({
+                ...orderbookData,
+                tradedToken: await fetchToken(orderbookData.tradedToken, abortSignal),
+                baseToken: await fetchToken(orderbookData.baseToken, abortSignal),
+            });
         }
     }
 }

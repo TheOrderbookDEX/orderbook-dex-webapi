@@ -1,8 +1,7 @@
-import { IOrderbookV1 } from '@theorderbookdex/orderbook-dex-v1/dist/interfaces/IOrderbookV1';
 import { IOrderbookFactoryV1, OrderbookCreated } from '@theorderbookdex/orderbook-dex-v1/dist/interfaces/IOrderbookFactoryV1';
 import { IOrderbook } from '@theorderbookdex/orderbook-dex/dist/interfaces/IOrderbook';
-import { Address } from './Address';
-import { Cache } from './Cache';
+import { Address, ZERO_ADDRESS } from './Address';
+import { Cache, CachedOrderbook } from './Cache';
 import { OrderbookDEXInternal } from './OrderbookDEX';
 import { fetchToken, Token } from './Token';
 import { asyncCatchError, asyncFirst, checkAbortSignal } from './utils';
@@ -123,36 +122,53 @@ interface OrderbookProperties {
     readonly creationBlockNumber: number;
 }
 
-export async function fetchOrderbook(address: Address, abortSignal?: AbortSignal): Promise<Orderbook> {
+const FETCH_ORDERBOOKS_BATCH = 10n;
+
+export async function* fetchOrderbooksData(abortSignal?: AbortSignal) {
+    checkAbortSignal(abortSignal);
+    const { orderbookFactoryV1 } = OrderbookDEXInternal.instance._config;
+    let index = 0;
+    for await (const orderbook of Cache.instance.getOrderbooks(orderbookFactoryV1)) {
+        index = orderbook.factoryIndex as number + 1;
+        yield orderbook;
+    }
+    const orderbookFactory = IOrderbookFactoryV1.at(orderbookFactoryV1);
+    const totalCreated = Number(await orderbookFactory.totalCreated());
+    checkAbortSignal(abortSignal);
+    while (index < totalCreated) {
+        for (const address of await orderbookFactory.orderbooks(BigInt(index), FETCH_ORDERBOOKS_BATCH)) {
+            if (address == ZERO_ADDRESS) break;
+            const orderbook: CachedOrderbook = {
+                ...await fetchOrderbookData(address as Address, abortSignal),
+                factory: orderbookFactoryV1,
+                factoryIndex: index,
+            };
+            await Cache.instance.saveOrderbook(orderbook);
+            yield orderbook;
+            index++;
+        }
+    }
+}
+
+export async function fetchOrderbookData(address: Address, abortSignal?: AbortSignal) {
     checkAbortSignal(abortSignal);
     try {
-        const cachedOrderbook = await Cache.instance.getOrderbook(address, abortSignal);
-        return new OrderbookInternal({
-            ...cachedOrderbook,
-            tradedToken: await fetchToken(cachedOrderbook.tradedToken, abortSignal),
-            baseToken: await fetchToken(cachedOrderbook.baseToken, abortSignal),
-        });
+        return await Cache.instance.getOrderbook(address, abortSignal);
     } catch {
         const contract = IOrderbook.at(address);
         const version = await asyncCatchError(contract.version(), NotAnOrderbook);
         checkAbortSignal(abortSignal);
         switch (version) {
             case Orderbook.V1: {
-                const contract = IOrderbookV1.at(address);
-                const tradedToken = await fetchToken(await asyncCatchError(contract.tradedToken(), NotAnOrderbook) as Address, abortSignal);
+                const orderbookFactory = IOrderbookFactoryV1.at(OrderbookDEXInternal.instance._config.orderbookFactoryV1);
+                // TODO fix in abi2ts-lib: 0 should be default value for fromBlock
+                const event = await asyncFirst(OrderbookCreated.get({ address: orderbookFactory.address, orderbook: address, fromBlock: 0 }));
                 checkAbortSignal(abortSignal);
-                const baseToken = await fetchToken(await asyncCatchError(contract.baseToken(), NotAnOrderbook) as Address, abortSignal);
-                checkAbortSignal(abortSignal);
-                const contractSize = await asyncCatchError(contract.contractSize(), NotAnOrderbook);
-                checkAbortSignal(abortSignal);
-                const priceTick = await asyncCatchError(contract.priceTick(), NotAnOrderbook);
-                checkAbortSignal(abortSignal);
-                const creationBlockNumber = await fetchOrderbookCreationBlockNumber(address);
-                checkAbortSignal(abortSignal);
-                await Cache.instance.saveOrderbook({
-                    address, version, tradedToken: tradedToken.address, baseToken: baseToken.address, contractSize, priceTick, creationBlockNumber
-                }, abortSignal);
-                return new OrderbookInternal({ address, version, tradedToken, baseToken, contractSize, priceTick, creationBlockNumber });
+                if (!event) throw new NotAnOrderbook();
+                const { tradedToken, baseToken, contractSize, priceTick, blockNumber: creationBlockNumber } = event;
+                const orderbook = { address, version, tradedToken, baseToken, contractSize, priceTick, creationBlockNumber } as CachedOrderbook;
+                await Cache.instance.saveOrderbook(orderbook, abortSignal);
+                return orderbook;
             }
             default: {
                 throw new UnsupportedOrderbookVersion;
@@ -161,12 +177,13 @@ export async function fetchOrderbook(address: Address, abortSignal?: AbortSignal
     }
 }
 
-export async function fetchOrderbookCreationBlockNumber(orderbook: Address): Promise<number> {
-    const orderbookFactory = IOrderbookFactoryV1.at(OrderbookDEXInternal.instance._config.orderbookFactoryV1);
-    // TODO fix in abi2ts-lib: 0 should be default value for fromBlock
-    const event = await asyncFirst(OrderbookCreated.get({ address: orderbookFactory.address, orderbook, fromBlock: 0 }));
-    if (!event) throw new NotAnOrderbook();
-    return event.blockNumber;
+export async function fetchOrderbook(address: Address, abortSignal?: AbortSignal): Promise<Orderbook> {
+    const orderbookData = await fetchOrderbookData(address, abortSignal);
+    return new OrderbookInternal({
+        ...orderbookData,
+        tradedToken: await fetchToken(orderbookData.tradedToken, abortSignal),
+        baseToken: await fetchToken(orderbookData.baseToken, abortSignal),
+    });
 }
 
 /**
