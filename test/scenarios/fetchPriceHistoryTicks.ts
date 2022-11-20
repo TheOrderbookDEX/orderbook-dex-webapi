@@ -7,7 +7,7 @@ interface Scenario {
     preFetchedRange?: (toBlockNumber: ToBlockNumberFunction) => [number, number];
     fetchedRange: (toBlockNumber: ToBlockNumberFunction) => [number, number];
     expectedTicks: bigint[];
-    expectedCacheRanges: (toBlockNumber: ToBlockNumberFunction) => [number, number][];
+    expectedDatabaseRanges: (toBlockNumber: ToBlockNumberFunction) => [number, number][];
     expectedFilledFetched: (toBlockNumber: ToBlockNumberFunction) => [number, number][];
 }
 
@@ -20,7 +20,7 @@ fetchPriceHistoryTicksScenarios.push({
     existingTicks,
     fetchedRange: _ => [_(0), _(9)],
     expectedTicks: existingTicks,
-    expectedCacheRanges: _ => [[_(0), _(9)]],
+    expectedDatabaseRanges: _ => [[_(0), _(9)]],
     expectedFilledFetched: _ => [[_(0), _(9)]],
 });
 
@@ -30,7 +30,7 @@ fetchPriceHistoryTicksScenarios.push({
     preFetchedRange: _ => [_(0), _(9)],
     fetchedRange: _ => [_(0), _(9)],
     expectedTicks: existingTicks,
-    expectedCacheRanges: _ => [[_(0), _(9)]],
+    expectedDatabaseRanges: _ => [[_(0), _(9)]],
     expectedFilledFetched: () => [],
 });
 
@@ -39,7 +39,7 @@ fetchPriceHistoryTicksScenarios.push({
     existingTicks,
     fetchedRange: _ => [_(0), _(4)],
     expectedTicks: existingTicks.slice(0, 5),
-    expectedCacheRanges: _ => [[_(0), _(4)]],
+    expectedDatabaseRanges: _ => [[_(0), _(4)]],
     expectedFilledFetched: _ => [[_(0), _(4)]],
 });
 
@@ -48,7 +48,7 @@ fetchPriceHistoryTicksScenarios.push({
     existingTicks,
     fetchedRange: _ => [_(5), _(9)],
     expectedTicks: existingTicks.slice(5, 10),
-    expectedCacheRanges: _ => [[_(5), _(9)]],
+    expectedDatabaseRanges: _ => [[_(5), _(9)]],
     expectedFilledFetched: _ => [[_(5), _(9)]],
 });
 
@@ -58,7 +58,7 @@ fetchPriceHistoryTicksScenarios.push({
     preFetchedRange: _ => [_(0), _(9)],
     fetchedRange: _ => [_(0), _(4)],
     expectedTicks: existingTicks.slice(0, 5),
-    expectedCacheRanges: _ => [[_(0), _(9)]],
+    expectedDatabaseRanges: _ => [[_(0), _(9)]],
     expectedFilledFetched: () => [],
 });
 
@@ -68,7 +68,7 @@ fetchPriceHistoryTicksScenarios.push({
     preFetchedRange: _ => [_(0), _(9)],
     fetchedRange: _ => [_(5), _(9)],
     expectedTicks: existingTicks.slice(5, 10),
-    expectedCacheRanges: _ => [[_(0), _(9)]],
+    expectedDatabaseRanges: _ => [[_(0), _(9)]],
     expectedFilledFetched: () => [],
 });
 
@@ -78,7 +78,7 @@ fetchPriceHistoryTicksScenarios.push({
     preFetchedRange: _ => [_(0), _(4)],
     fetchedRange: _ => [_(0), _(9)],
     expectedTicks: existingTicks,
-    expectedCacheRanges: _ => [[_(0), _(9)]],
+    expectedDatabaseRanges: _ => [[_(0), _(9)]],
     expectedFilledFetched: _ => [[_(4)+1, _(9)]],
 });
 
@@ -88,7 +88,7 @@ fetchPriceHistoryTicksScenarios.push({
     preFetchedRange: _ => [_(5), _(9)],
     fetchedRange: _ => [_(0), _(9)],
     expectedTicks: existingTicks,
-    expectedCacheRanges: _ => [[_(0), _(9)]],
+    expectedDatabaseRanges: _ => [[_(0), _(9)]],
     expectedFilledFetched: _ => [[_(0), _(5)-1]],
 });
 
@@ -98,7 +98,7 @@ fetchPriceHistoryTicksScenarios.push({
     preFetchedRange: _ => [_(5), _(9)],
     fetchedRange: _ => [_(0), _(4)],
     expectedTicks: existingTicks.slice(0, 5),
-    expectedCacheRanges: _ => [[_(0), _(4)], [_(5), _(9)]],
+    expectedDatabaseRanges: _ => [[_(0), _(4)], [_(5), _(9)]],
     expectedFilledFetched: _ => [[_(0), _(4)]],
 });
 
@@ -108,6 +108,6 @@ fetchPriceHistoryTicksScenarios.push({
     preFetchedRange: _ => [_(0), _(4)],
     fetchedRange: _ => [_(5), _(9)],
     expectedTicks: existingTicks.slice(5, 10),
-    expectedCacheRanges: _ => [[_(0), _(4)], [_(5), _(9)]],
+    expectedDatabaseRanges: _ => [[_(0), _(4)], [_(5), _(9)]],
     expectedFilledFetched: _ => [[_(5), _(9)]],
 });

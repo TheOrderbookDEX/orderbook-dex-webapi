@@ -8,7 +8,7 @@ import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-prov
 import { resetIndexedDB } from './indexeddb';
 import { setUpSmartContracts, simulateTicks } from './smart-contracts';
 import { OrderbookDEX, orderbookDEXChainConfigs } from '../src/OrderbookDEX';
-import { Cache } from '../src/Cache';
+import { Database } from '../src/Database';
 import { fetchPriceHistoryTicksScenarios } from './scenarios/fetchPriceHistoryTicks';
 import { getBlockNumber } from '@frugal-wizard/abi2ts-lib';
 import { Address } from '../src/Address';
@@ -60,8 +60,8 @@ describe('fetchPriceHistoryTicks', function() {
                     value: scenario.expectedTicks.map(String),
                 });
                 addContext(this, {
-                    title: 'expectedCacheRanges',
-                    value: scenario.expectedCacheRanges,
+                    title: 'expectedDatabaseRanges',
+                    value: scenario.expectedDatabaseRanges,
                 });
                 await simulateTicks(testOrderbook, scenario.existingTicks);
                 latestBlockNumber = await getBlockNumber();
@@ -81,10 +81,10 @@ describe('fetchPriceHistoryTicks', function() {
                 }
             });
 
-            it('should leave cache ranges as expected', async function() {
+            it('should leave database ranges as expected', async function() {
                 await fetchPriceHistoryTicks(testOrderbook, ...scenario.fetchedRange(toBlockNumber));
-                const ranges = await Cache.instance.getPriceHistoryRanges(testOrderbook, 0, Infinity);
-                const expected = scenario.expectedCacheRanges(toBlockNumber);
+                const ranges = await Database.instance.getPriceHistoryRanges(testOrderbook, 0, Infinity);
+                const expected = scenario.expectedDatabaseRanges(toBlockNumber);
                 expect(ranges)
                     .to.have.length(expected.length);
                 for (const [ index, { fromBlock, toBlock } ] of ranges.entries()) {

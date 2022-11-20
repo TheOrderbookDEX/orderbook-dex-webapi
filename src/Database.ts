@@ -3,25 +3,17 @@ import { Address } from './Address';
 import { OrderExecutionType, OrderStatus, OrderType } from './Order';
 import { checkAbortSignal } from './utils';
 
-// TODO rename Cache to Database and related types accordingly
 // TODO move UserData persisted data here
 
-export class Cache {
-    private static _instance?: Cache;
+export class Database {
+    private static _instance?: Database;
 
     static async load(chainId: number, version?: number) {
         if (!this._instance) {
-            if (!version || version > 3) version = 3;
-            if (version < 3) throw new Error('version removed');
-            const db = await openDB<CacheV3>(`Cache${chainId}`, version, {
+            if (!version || version > 1) version = 1;
+            const db = await openDB<DatabaseSchemaV1>(`Database${chainId}`, version, {
                 async upgrade(db, oldVersion, newVersion: number) {
-                    if (oldVersion < 3) {
-                        const olddb = db as IDBPDatabase;
-                        for (const name of olddb.objectStoreNames) {
-                            olddb.deleteObjectStore(name);
-                        }
-                    }
-                    if (newVersion >= 3) {
+                    if (newVersion >= 1) {
                         db.createObjectStore('blocks', {
                             keyPath: 'blockNumber',
                         });
@@ -46,13 +38,13 @@ export class Cache {
                     }
                 }
             });
-            this._instance = new Cache(db);
+            this._instance = new Database(db);
         }
     }
 
     static get instance() {
         if (!this._instance) {
-            throw new Error('Cache not loaded');
+            throw new Error('Database not loaded');
         }
         return this._instance;
     }
@@ -64,13 +56,13 @@ export class Cache {
         }
     }
 
-    constructor(private readonly _db: IDBPDatabase<CacheV3>) {}
+    constructor(private readonly _db: IDBPDatabase<DatabaseSchemaV1>) {}
 
     async getBlockTimestamp(blockNumber: number, abortSignal?: AbortSignal) {
         checkAbortSignal(abortSignal);
         const block = await this._db.get('blocks', blockNumber);
         checkAbortSignal(abortSignal);
-        if (!block) throw new CacheMiss;
+        if (!block) throw new NotInDatabase;
         return block.timestamp;
     }
 
@@ -84,11 +76,11 @@ export class Cache {
         checkAbortSignal(abortSignal);
         const token = await this._db.get('tokens', address);
         checkAbortSignal(abortSignal);
-        if (!token) throw new CacheMiss;
+        if (!token) throw new NotInDatabase;
         return token;
     }
 
-    async saveToken(token: CachedToken, abortSignal?: AbortSignal) {
+    async saveToken(token: TokenData, abortSignal?: AbortSignal) {
         const { address, name, symbol, decimals } = token;
         await this._db.put('tokens', { address, name, symbol, decimals });
         checkAbortSignal(abortSignal);
@@ -100,8 +92,8 @@ export class Cache {
         const lastIndex = await this.getLastFactoryIndex(factory, abortSignal);
         if (!lastIndex) return;
         // due to how indexeddb works, we first fetch a batch then yield it
-        for (let index = 0; index <= lastIndex; index += Cache.GET_ORDERBOOKS_BATCH) {
-            const query = IDBKeyRange.bound([factory, index], [factory, index + Cache.GET_ORDERBOOKS_BATCH - 1]);
+        for (let index = 0; index <= lastIndex; index += Database.GET_ORDERBOOKS_BATCH) {
+            const query = IDBKeyRange.bound([factory, index], [factory, index + Database.GET_ORDERBOOKS_BATCH - 1]);
             const orderbooks = await this._db.getAllFromIndex('orderbooks', 'byFactoryIndex', query);
             checkAbortSignal(abortSignal);
             for (const orderbook of orderbooks) {
@@ -121,11 +113,11 @@ export class Cache {
         checkAbortSignal(abortSignal);
         const orderbook = await this._db.get('orderbooks', address);
         checkAbortSignal(abortSignal);
-        if (!orderbook) throw new CacheMiss;
+        if (!orderbook) throw new NotInDatabase;
         return orderbook;
     }
 
-    async saveOrderbook(orderbook: CachedOrderbook, abortSignal?: AbortSignal) {
+    async saveOrderbook(orderbook: OrderbookData, abortSignal?: AbortSignal) {
         const {
             address,
             version,
@@ -152,7 +144,7 @@ export class Cache {
     }
 
     private async _getPriceHistoryRanges(
-        tx: IDBPTransaction<CacheV3, ['priceHistoryRanges'], 'readonly' | 'readwrite'>,
+        tx: IDBPTransaction<DatabaseSchemaV1, ['priceHistoryRanges'], 'readonly' | 'readwrite'>,
         orderbook: Address, fromBlock: number, toBlock: number
     ) {
         const keyRange = IDBKeyRange.bound([orderbook, fromBlock], [orderbook, toBlock]);
@@ -194,7 +186,7 @@ export class Cache {
         return ticks;
     }
 
-    async savePriceHistoryTick(tick: CachedPriceHistoryTick, abortSignal?: AbortSignal) {
+    async savePriceHistoryTick(tick: PriceHistoryTickData, abortSignal?: AbortSignal) {
         await this._db.put('priceHistoryTicks', tick);
         checkAbortSignal(abortSignal);
     }
@@ -209,7 +201,7 @@ export class Cache {
     async getRecentOrders(owner: Address, count: number, abortSignal?: AbortSignal) {
         const range = IDBKeyRange.bound([owner, -Infinity], [owner, Infinity]);
         let cursor = await this._db.transaction('orders').store.index('byOwner').openCursor(range, 'prev');
-        const orders: CachedOrder[] = [];
+        const orders: OrderData[] = [];
         while (cursor && count > 0) {
             orders.push(cursor.value);
             cursor = await cursor.continue();
@@ -222,25 +214,25 @@ export class Cache {
     async getOrder(key: string, abortSignal?: AbortSignal) {
         const order = await this._db.get('orders', key);
         checkAbortSignal(abortSignal);
-        if (!order) throw new CacheMiss;
+        if (!order) throw new NotInDatabase;
         return order;
     }
 
     async getOpenOrders(owner: Address, abortSignal?: AbortSignal) {
-        const range = IDBKeyRange.bound([owner, CachedOrderMainStatus.OPEN, -Infinity], [owner, CachedOrderMainStatus.OPEN, Infinity]);
+        const range = IDBKeyRange.bound([owner, OrderMainStatus.OPEN, -Infinity], [owner, OrderMainStatus.OPEN, Infinity]);
         const orders = await this._db.getAllFromIndex('orders', 'byMainStatus', range);
         checkAbortSignal(abortSignal);
         return orders.reverse();
     }
 
     async getClosedOrders(owner: Address, abortSignal?: AbortSignal) {
-        const range = IDBKeyRange.bound([owner, CachedOrderMainStatus.CLOSED, -Infinity], [owner, CachedOrderMainStatus.CLOSED, Infinity]);
+        const range = IDBKeyRange.bound([owner, OrderMainStatus.CLOSED, -Infinity], [owner, OrderMainStatus.CLOSED, Infinity]);
         const orders = await this._db.getAllFromIndex('orders', 'byMainStatus', range);
         checkAbortSignal(abortSignal);
         return orders.reverse();
     }
 
-    async saveOrder(order: Omit<CachedOrder, 'mainStatus'>, abortSignal?: AbortSignal) {
+    async saveOrder(order: Omit<OrderData, 'mainStatus'>, abortSignal?: AbortSignal) {
         const {
             key,
             owner,
@@ -263,9 +255,9 @@ export class Cache {
             cancelTxHash,
         } = order;
         const mainStatus =
-              status.includes(OrderStatus.PENDING) ? CachedOrderMainStatus.OPEN
-            : status.includes(OrderStatus.OPEN) ? CachedOrderMainStatus.OPEN
-            : CachedOrderMainStatus.CLOSED;
+              status.includes(OrderStatus.PENDING) ? OrderMainStatus.OPEN
+            : status.includes(OrderStatus.OPEN) ? OrderMainStatus.OPEN
+            : OrderMainStatus.CLOSED;
         await this._db.put('orders', {
             key,
             owner,
@@ -291,32 +283,32 @@ export class Cache {
         checkAbortSignal(abortSignal);
     }
 
-    async deleteOrder(key: CachedOrder['key'], abortSignal?: AbortSignal) {
+    async deleteOrder(key: OrderData['key'], abortSignal?: AbortSignal) {
         await this._db.delete('orders', key);
         checkAbortSignal(abortSignal);
     }
 }
 
-export class CacheMiss extends Error {
+export class NotInDatabase extends Error {
     constructor() {
-        super('Cache Miss');
-        this.name = 'CacheMiss';
+        super('Not In Database');
+        this.name = 'NotInDatabase';
     }
 }
 
-export interface CachedBlock {
+export interface BlockData {
     blockNumber: number;
     timestamp: number;
 }
 
-export interface CachedToken {
+export interface TokenData {
     address: Address;
     name: string;
     symbol: string;
     decimals: number;
 }
 
-export interface CachedOrderbook {
+export interface OrderbookData {
     address: Address;
     version: bigint;
     tradedToken: Address;
@@ -328,13 +320,13 @@ export interface CachedOrderbook {
     factoryIndex?: number;
 }
 
-export interface CachedPriceHistoryRange {
+export interface PriceHistoryRangeData {
     orderbook: Address;
     fromBlock: number;
     toBlock: number;
 }
 
-export interface CachedPriceHistoryTick {
+export interface PriceHistoryTickData {
     readonly orderbook: string;
     readonly blockNumber: number;
     readonly logIndex: number;
@@ -342,19 +334,19 @@ export interface CachedPriceHistoryTick {
     readonly price: bigint;
 }
 
-export enum CachedOrderMainStatus {
+export enum OrderMainStatus {
     OPEN,
     CLOSED,
 }
 
-export interface CachedOrder {
+export interface OrderData {
     key: string;
     owner: Address;
     timestamp: number;
     orderbook: Address;
     txHash: string;
     id: bigint;
-    mainStatus: CachedOrderMainStatus;
+    mainStatus: OrderMainStatus;
     status: readonly OrderStatus[];
     type: OrderType;
     execution: OrderExecutionType;
@@ -370,52 +362,52 @@ export interface CachedOrder {
     cancelTxHash: string;
 }
 
-interface CacheV3 extends DBSchema {
+interface DatabaseSchemaV1 extends DBSchema {
     blocks: {
-        key: CachedBlock['blockNumber'];
-        value: CachedBlock;
+        key: BlockData['blockNumber'];
+        value: BlockData;
     },
     tokens: {
-        key: CachedToken['address'];
-        value: CachedToken;
+        key: TokenData['address'];
+        value: TokenData;
     },
     orderbooks: {
-        key: CachedOrderbook['address'];
-        value: CachedOrderbook;
+        key: OrderbookData['address'];
+        value: OrderbookData;
         indexes: {
             byFactoryIndex: [
-                NonNullable<CachedOrderbook['factory']>,
-                NonNullable<CachedOrderbook['factoryIndex']>,
+                NonNullable<OrderbookData['factory']>,
+                NonNullable<OrderbookData['factoryIndex']>,
             ];
         };
     },
     priceHistoryRanges: {
         key: [
-            CachedPriceHistoryRange['orderbook'],
-            CachedPriceHistoryRange['toBlock'],
+            PriceHistoryRangeData['orderbook'],
+            PriceHistoryRangeData['toBlock'],
         ];
-        value: CachedPriceHistoryRange;
+        value: PriceHistoryRangeData;
     },
     priceHistoryTicks: {
         key: [
-            CachedPriceHistoryTick['orderbook'],
-            CachedPriceHistoryTick['blockNumber'],
-            CachedPriceHistoryTick['logIndex'],
+            PriceHistoryTickData['orderbook'],
+            PriceHistoryTickData['blockNumber'],
+            PriceHistoryTickData['logIndex'],
         ];
-        value: CachedPriceHistoryTick;
+        value: PriceHistoryTickData;
     },
     orders: {
-        key: CachedOrder['key'];
-        value: CachedOrder;
+        key: OrderData['key'];
+        value: OrderData;
         indexes: {
             byOwner: [
-                CachedOrder['owner'],
-                CachedOrder['timestamp'],
+                OrderData['owner'],
+                OrderData['timestamp'],
             ];
             byMainStatus: [
-                CachedOrder['owner'],
-                CachedOrder['mainStatus'],
-                CachedOrder['timestamp'],
+                OrderData['owner'],
+                OrderData['mainStatus'],
+                OrderData['timestamp'],
             ];
         };
     },

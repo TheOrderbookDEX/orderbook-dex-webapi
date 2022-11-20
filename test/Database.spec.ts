@@ -3,7 +3,7 @@ import { use, expect } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import addContext from 'mochawesome/addContext';
 import { Address } from '../src/Address';
-import { Cache } from '../src/Cache';
+import { Database } from '../src/Database';
 import { orderbookDEXChainConfigs } from '../src/OrderbookDEX';
 import { resetIndexedDB } from './indexeddb';
 import { addPriceHistoryRangeScenarios } from './scenarios/addPriceHistoryRange';
@@ -13,37 +13,37 @@ use(chaiAsPromised);
 
 const testOrderbook = orderbookDEXChainConfigs[1337]?.orderbooks[0] as Address;
 
-describe('Cache', function() {
+describe('Database', function() {
     afterEach(async function() {
-        Cache.unload();
+        Database.unload();
         resetIndexedDB();
     });
 
-    // no need to test upgrade for now, we are resetting the db in version 3
+    // no need to test upgrade for now
     describe.skip('upgrade', function() {
-        // TODO test Cache upgrade thoroughly
+        // TODO test Database upgrade thoroughly
 
-        describe('from version 3', function() {
+        describe('from version 1', function() {
             beforeEach(async function() {
-                await Cache.load(1, 3);
-                Cache.unload();
+                await Database.load(1, 1);
+                Database.unload();
             });
 
             it('should work', async function() {
-                await Cache.load(1);
+                await Database.load(1);
             });
         });
     });
 
     describe('functions', function() {
         beforeEach(async function() {
-            await Cache.load(1);
+            await Database.load(1);
         });
 
         describe('getOrderbooks', function() {
             beforeEach(async function() {
-                for (let n = 1; n <= Cache.GET_ORDERBOOKS_BATCH + 1; n++) {
-                    await Cache.instance.saveOrderbook({
+                for (let n = 1; n <= Database.GET_ORDERBOOKS_BATCH + 1; n++) {
+                    await Database.instance.saveOrderbook({
                         address: hexstring(0x1000000000000000000000000000000000000000n + BigInt(n)) as Address,
                         version: 10000n,
                         tradedToken: hexstring(0x2000000000000000000000000000000000000000n + BigInt(n)) as Address,
@@ -59,7 +59,7 @@ describe('Cache', function() {
 
             it('should return all orderbooks sorted by factory index', async function() {
                 let n = 0;
-                for await (const orderbook of Cache.instance.getOrderbooks('0x1000000000000000000000000000000000000000' as Address)) {
+                for await (const orderbook of Database.instance.getOrderbooks('0x1000000000000000000000000000000000000000' as Address)) {
                     n++;
                     expect(orderbook.address)
                         .to.be.equal(hexstring(0x1000000000000000000000000000000000000000n + BigInt(n)));
@@ -81,7 +81,7 @@ describe('Cache', function() {
                         .to.be.equal(n - 1);
                 }
                 expect(n)
-                    .to.be.equal(Cache.GET_ORDERBOOKS_BATCH + 1);
+                    .to.be.equal(Database.GET_ORDERBOOKS_BATCH + 1);
             });
         });
 
@@ -102,13 +102,13 @@ describe('Cache', function() {
                             value: scenario.expectedRanges,
                         });
                         for (const [fromBlock, toBlock] of scenario.existingRanges) {
-                            await Cache.instance.addPriceHistoryRange(testOrderbook, fromBlock, toBlock);
+                            await Database.instance.addPriceHistoryRange(testOrderbook, fromBlock, toBlock);
                         }
                     });
 
                     it('should return expected ranges', async function() {
                         const [fromBlock, toBlock] = scenario.testedRange;
-                        const ranges = await Cache.instance.getPriceHistoryRanges(testOrderbook, fromBlock, toBlock);
+                        const ranges = await Database.instance.getPriceHistoryRanges(testOrderbook, fromBlock, toBlock);
                         expect(ranges)
                             .to.have.length(scenario.expectedRanges.length);
                         for (const [index, range] of ranges.entries()) {
@@ -139,14 +139,14 @@ describe('Cache', function() {
                             value: scenario.expectedRanges,
                         });
                         for (const [fromBlock, toBlock] of scenario.existingRanges) {
-                            await Cache.instance.addPriceHistoryRange(testOrderbook, fromBlock, toBlock);
+                            await Database.instance.addPriceHistoryRange(testOrderbook, fromBlock, toBlock);
                         }
                     });
 
                     it('should update ranges as expected', async function() {
                         const [fromBlock, toBlock] = scenario.addedRange;
-                        await Cache.instance.addPriceHistoryRange(testOrderbook, fromBlock, toBlock);
-                        const ranges = await Cache.instance.getPriceHistoryRanges(testOrderbook, 0, Infinity);
+                        await Database.instance.addPriceHistoryRange(testOrderbook, fromBlock, toBlock);
+                        const ranges = await Database.instance.getPriceHistoryRanges(testOrderbook, 0, Infinity);
                         expect(ranges)
                             .to.have.length(scenario.expectedRanges.length);
                         for (const [index, range] of ranges.entries()) {

@@ -1,7 +1,7 @@
 import { IOrderbookFactoryV1, OrderbookCreated } from '@theorderbookdex/orderbook-dex-v1/dist/interfaces/IOrderbookFactoryV1';
 import { IOrderbook } from '@theorderbookdex/orderbook-dex/dist/interfaces/IOrderbook';
 import { Address, ZERO_ADDRESS } from './Address';
-import { Cache, CachedOrderbook } from './Cache';
+import { Database, OrderbookData } from './Database';
 import { OrderbookDEXInternal } from './OrderbookDEX';
 import { fetchToken, Token } from './Token';
 import { asyncCatchError, asyncFirst, checkAbortSignal } from './utils';
@@ -128,7 +128,7 @@ export async function* fetchOrderbooksData(abortSignal?: AbortSignal) {
     checkAbortSignal(abortSignal);
     const { orderbookFactoryV1 } = OrderbookDEXInternal.instance._config;
     let index = 0;
-    for await (const orderbook of Cache.instance.getOrderbooks(orderbookFactoryV1)) {
+    for await (const orderbook of Database.instance.getOrderbooks(orderbookFactoryV1)) {
         index = orderbook.factoryIndex as number + 1;
         yield orderbook;
     }
@@ -138,12 +138,12 @@ export async function* fetchOrderbooksData(abortSignal?: AbortSignal) {
     while (index < totalCreated) {
         for (const address of await orderbookFactory.orderbooks(BigInt(index), FETCH_ORDERBOOKS_BATCH)) {
             if (address == ZERO_ADDRESS) break;
-            const orderbook: CachedOrderbook = {
+            const orderbook: OrderbookData = {
                 ...await fetchOrderbookData(address as Address, abortSignal),
                 factory: orderbookFactoryV1,
                 factoryIndex: index,
             };
-            await Cache.instance.saveOrderbook(orderbook);
+            await Database.instance.saveOrderbook(orderbook);
             yield orderbook;
             index++;
         }
@@ -153,7 +153,7 @@ export async function* fetchOrderbooksData(abortSignal?: AbortSignal) {
 export async function fetchOrderbookData(address: Address, abortSignal?: AbortSignal) {
     checkAbortSignal(abortSignal);
     try {
-        return await Cache.instance.getOrderbook(address, abortSignal);
+        return await Database.instance.getOrderbook(address, abortSignal);
     } catch {
         const contract = IOrderbook.at(address);
         const version = await asyncCatchError(contract.version(), NotAnOrderbook);
@@ -166,8 +166,8 @@ export async function fetchOrderbookData(address: Address, abortSignal?: AbortSi
                 checkAbortSignal(abortSignal);
                 if (!event) throw new NotAnOrderbook();
                 const { tradedToken, baseToken, contractSize, priceTick, blockNumber: creationBlockNumber } = event;
-                const orderbook = { address, version, tradedToken, baseToken, contractSize, priceTick, creationBlockNumber } as CachedOrderbook;
-                await Cache.instance.saveOrderbook(orderbook, abortSignal);
+                const orderbook = { address, version, tradedToken, baseToken, contractSize, priceTick, creationBlockNumber } as OrderbookData;
+                await Database.instance.saveOrderbook(orderbook, abortSignal);
                 return orderbook;
             }
             default: {

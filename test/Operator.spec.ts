@@ -2,7 +2,7 @@ import { Transaction } from '@frugal-wizard/abi2ts-lib';
 import { expect, use } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import { Chain, Order, Orderbook, OrderbookDEX, Token, UserData, Operator, OperatorEventType } from '../src';
-import { Cache } from '../src/Cache';
+import { Database } from '../src/Database';
 import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-provider';
 import { resetIndexedDB } from './indexeddb';
 import { setUpSmartContracts } from './smart-contracts';
@@ -157,7 +157,7 @@ describe('Operator', function() {
 
 async function waitForOrdersPendingTransactions() {
     const pending: Promise<Transaction>[] = [];
-    for (const order of await Cache.instance.getOpenOrders(Operator.instance.operatorAddress)) {
+    for (const order of await Database.instance.getOpenOrders(Operator.instance.operatorAddress)) {
         if (order.txHash) {
             pending.push(Transaction.get(order.txHash));
         }

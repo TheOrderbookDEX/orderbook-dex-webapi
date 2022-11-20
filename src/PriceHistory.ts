@@ -4,7 +4,7 @@ import { GenericEventListener } from './event-types';
 import { EventTargetX } from './EventTargetX';
 import { checkAbortSignal, isAbortReason } from './utils';
 import { fetchOrderbook, OrderbookInternal } from './Orderbook';
-import { Cache } from './Cache';
+import { Database } from './Database';
 import { ContractEvent, getBlockNumber } from '@frugal-wizard/abi2ts-lib';
 import { ChainEvents } from './ChainEvents';
 import { Address } from './Address';
@@ -209,31 +209,31 @@ export async function captureFilledEventFetched(callback: () => Promise<void>) {
     return captured;
 }
 
-async function addPriceHistoryTicksToCache(orderbook: Address, fromBlock: number, toBlock: number, abortSignal?: AbortSignal) {
+async function addPriceHistoryTicksToDatabase(orderbook: Address, fromBlock: number, toBlock: number, abortSignal?: AbortSignal) {
     checkAbortSignal(abortSignal);
     for await (const { price, blockNumber, logIndex } of filledEventFetcher(orderbook, fromBlock, toBlock)) {
         const timestamp = await fetchBlockTimestamp(blockNumber, abortSignal);
-        await Cache.instance.savePriceHistoryTick({ orderbook, blockNumber, logIndex, price, timestamp }, abortSignal);
+        await Database.instance.savePriceHistoryTick({ orderbook, blockNumber, logIndex, price, timestamp }, abortSignal);
     }
-    await Cache.instance.addPriceHistoryRange(orderbook, fromBlock, toBlock, abortSignal);
+    await Database.instance.addPriceHistoryRange(orderbook, fromBlock, toBlock, abortSignal);
 }
 
-async function addMissingPriceHistoryTicksToCache(orderbook: Address, fromBlock: number, toBlock: number, abortSignal?: AbortSignal) {
+async function addMissingPriceHistoryTicksToDatabase(orderbook: Address, fromBlock: number, toBlock: number, abortSignal?: AbortSignal) {
     checkAbortSignal(abortSignal);
-    for (const range of await Cache.instance.getPriceHistoryRanges(orderbook, fromBlock, toBlock, abortSignal)) {
+    for (const range of await Database.instance.getPriceHistoryRanges(orderbook, fromBlock, toBlock, abortSignal)) {
         if (fromBlock < range.fromBlock) {
-            await addPriceHistoryTicksToCache(orderbook, fromBlock, range.fromBlock - 1, abortSignal);
+            await addPriceHistoryTicksToDatabase(orderbook, fromBlock, range.fromBlock - 1, abortSignal);
         }
         fromBlock = range.toBlock + 1;
     }
     if (fromBlock < toBlock) {
-        await addPriceHistoryTicksToCache(orderbook, fromBlock, toBlock, abortSignal);
+        await addPriceHistoryTicksToDatabase(orderbook, fromBlock, toBlock, abortSignal);
     }
 }
 
 export async function fetchPriceHistoryTicks(orderbook: Address, fromBlock: number, toBlock: number, abortSignal?: AbortSignal) {
-    await addMissingPriceHistoryTicksToCache(orderbook, fromBlock, toBlock, abortSignal);
-    return await Cache.instance.getPriceHistoryTicks(orderbook, fromBlock, toBlock, abortSignal);
+    await addMissingPriceHistoryTicksToDatabase(orderbook, fromBlock, toBlock, abortSignal);
+    return await Database.instance.getPriceHistoryTicks(orderbook, fromBlock, toBlock, abortSignal);
 }
 
 export function listenToPriceHistoryTicks(orderbook: Address, abortSignal: AbortSignal, listener: (tick: PriceHistoryTickInternal) => void) {
@@ -248,11 +248,11 @@ export function listenToPriceHistoryTicks(orderbook: Address, abortSignal: Abort
                     await prevUpdate;
                     checkAbortSignal(abortSignal);
                     if (blockNumber > fromBlock) {
-                        await Cache.instance.addPriceHistoryRange(orderbook, fromBlock, blockNumber - 1, abortSignal);
+                        await Database.instance.addPriceHistoryRange(orderbook, fromBlock, blockNumber - 1, abortSignal);
                         fromBlock = blockNumber;
                     }
                     const timestamp = await fetchBlockTimestamp(blockNumber, abortSignal);
-                    await Cache.instance.savePriceHistoryTick({ orderbook, blockNumber, logIndex, price, timestamp }, abortSignal);
+                    await Database.instance.savePriceHistoryTick({ orderbook, blockNumber, logIndex, price, timestamp }, abortSignal);
                     listener({ orderbook, blockNumber, logIndex, price, timestamp });
                 } catch (error) {
                     if (!isAbortReason(abortSignal, error)) {

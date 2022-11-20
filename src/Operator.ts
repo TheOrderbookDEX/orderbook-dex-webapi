@@ -9,7 +9,7 @@ import { fetchOrderbook, Orderbook } from './Orderbook';
 import { checkAbortSignal, createSubAbortController, max, min } from './utils';
 import { ContractEvent, decodeErrorData, MAX_UINT32, Transaction } from '@frugal-wizard/abi2ts-lib';
 import { IERC20 } from '@theorderbookdex/orderbook-dex/dist/interfaces/IERC20';
-import { Cache } from './Cache';
+import { Database } from './Database';
 import { OrderInternal, Order, OrderExecutionType, OrderStatus, OrderType, encodeOrderType } from './Order';
 import { now } from './time';
 import { GenericEventListener } from './event-types';
@@ -620,37 +620,37 @@ export class OperatorInternal extends Operator {
     }
 
     async * orders(abortSignal?: AbortSignal) {
-        for (const cachedOrder of await Cache.instance.getOrders(this.operatorAddress, abortSignal)) {
+        for (const order of await Database.instance.getOrders(this.operatorAddress, abortSignal)) {
             yield {
-                ...cachedOrder,
-                orderbook: await fetchOrderbook(cachedOrder.orderbook, abortSignal),
+                ...order,
+                orderbook: await fetchOrderbook(order.orderbook, abortSignal),
             };
         }
     }
 
     async * recentOrders(count: number, abortSignal?: AbortSignal) {
-        for (const cachedOrder of await Cache.instance.getRecentOrders(this.operatorAddress, count, abortSignal)) {
+        for (const order of await Database.instance.getRecentOrders(this.operatorAddress, count, abortSignal)) {
             yield {
-                ...cachedOrder,
-                orderbook: await fetchOrderbook(cachedOrder.orderbook, abortSignal),
+                ...order,
+                orderbook: await fetchOrderbook(order.orderbook, abortSignal),
             };
         }
     }
 
     async * openOrders(abortSignal?: AbortSignal) {
-        for (const cachedOrder of await Cache.instance.getOpenOrders(this.operatorAddress, abortSignal)) {
+        for (const order of await Database.instance.getOpenOrders(this.operatorAddress, abortSignal)) {
             yield {
-                ...cachedOrder,
-                orderbook: await fetchOrderbook(cachedOrder.orderbook, abortSignal),
+                ...order,
+                orderbook: await fetchOrderbook(order.orderbook, abortSignal),
             };
         }
     }
 
     async * closedOrders(abortSignal?: AbortSignal) {
-        for (const cachedOrder of await Cache.instance.getClosedOrders(this.operatorAddress, abortSignal)) {
+        for (const order of await Database.instance.getClosedOrders(this.operatorAddress, abortSignal)) {
             yield {
-                ...cachedOrder,
-                orderbook: await fetchOrderbook(cachedOrder.orderbook, abortSignal),
+                ...order,
+                orderbook: await fetchOrderbook(order.orderbook, abortSignal),
             };
         }
     }
@@ -677,22 +677,22 @@ export class OperatorInternal extends Operator {
             claimTxHash: '',
             cancelTxHash: '',
         });
-        await Cache.instance.saveOrder({ ...order, orderbook: order.orderbook.address });
+        await Database.instance.saveOrder({ ...order, orderbook: order.orderbook.address });
         this.dispatchEvent(new OrderCreatedEvent(order));
         this.trackOrder(order);
     }
 
     private async saveOrder(order: OrderInternal, abortSignal?: AbortSignal) {
         order = updateOrderStatus(order);
-        await Cache.instance.saveOrder({ ...order, orderbook: order.orderbook.address }, abortSignal);
+        await Database.instance.saveOrder({ ...order, orderbook: order.orderbook.address }, abortSignal);
         this.dispatchEvent(new OrderUpdatedEvent(order));
     }
 
     private async refreshOrder(order: OrderInternal, abortSignal?: AbortSignal) {
-        const cachedOrder = await Cache.instance.getOrder(order.key, abortSignal);
+        const refreshedOrder = await Database.instance.getOrder(order.key, abortSignal);
         return {
-            ...cachedOrder,
-            orderbook: await fetchOrderbook(cachedOrder.orderbook),
+            ...refreshedOrder,
+            orderbook: await fetchOrderbook(refreshedOrder.orderbook),
         };
     }
 
@@ -833,7 +833,7 @@ export class OperatorInternal extends Operator {
         if (!order.status.includes(OrderStatus.CLOSED)) {
             throw new CannotDismissOrder();
         }
-        await Cache.instance.deleteOrder(order.key, abortSignal);
+        await Database.instance.deleteOrder(order.key, abortSignal);
         this.dispatchEvent(new OrderRemovedEvent(order));
     }
 }

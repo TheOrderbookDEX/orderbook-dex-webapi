@@ -1,6 +1,6 @@
 import { Ethereum, getEthereum } from './ethereum';
 import { checkAbortSignal } from './utils';
-import { Cache } from './Cache';
+import { Database } from './Database';
 import { ChainEvents } from './ChainEvents';
 import { getBlockTimestamp } from '@frugal-wizard/abi2ts-lib';
 
@@ -65,7 +65,7 @@ export class ChainInternal extends Chain {
             ethereum.on('chainChanged', () => {
                 location.reload();
             });
-            await Cache.load(chainId);
+            await Database.load(chainId);
             await ChainEvents.start();
         }
         return this._instance;
@@ -80,7 +80,7 @@ export class ChainInternal extends Chain {
 
     static disconnect() {
         ChainEvents.stop();
-        Cache.unload();
+        Database.unload();
         this._instance = undefined;
     }
 
@@ -106,11 +106,11 @@ export class ChainInternal extends Chain {
 export async function fetchBlockTimestamp(blockNumber: number, abortSignal?: AbortSignal) {
     checkAbortSignal(abortSignal);
     try {
-        return await Cache.instance.getBlockTimestamp(blockNumber, abortSignal);
+        return await Database.instance.getBlockTimestamp(blockNumber, abortSignal);
     } catch {
         const timestamp = await getBlockTimestamp(blockNumber);
         checkAbortSignal(abortSignal);
-        return await Cache.instance.saveBlockTimestamp(blockNumber, timestamp, abortSignal);
+        return await Database.instance.saveBlockTimestamp(blockNumber, timestamp, abortSignal);
     }
 }
 

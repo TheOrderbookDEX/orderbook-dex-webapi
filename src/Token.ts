@@ -1,7 +1,7 @@
 import { formatValue, parseValue } from '@frugal-wizard/abi2ts-lib';
 import { IERC20 } from '@theorderbookdex/orderbook-dex/dist/interfaces/IERC20';
 import { Address } from './Address';
-import { Cache } from './Cache';
+import { Database } from './Database';
 import { asyncCatchError, checkAbortSignal } from './utils';
 
 /**
@@ -78,7 +78,7 @@ interface TokenProperties {
 export async function fetchToken(address: Address, abortSignal?: AbortSignal): Promise<Token> {
     checkAbortSignal(abortSignal);
     try {
-        return new Token(await Cache.instance.getToken(address, abortSignal));
+        return new Token(await Database.instance.getToken(address, abortSignal));
     } catch {
         const contract = IERC20.at(address);
         const name = await asyncCatchError(contract.name(), NotAnERC20Token);
@@ -88,7 +88,7 @@ export async function fetchToken(address: Address, abortSignal?: AbortSignal): P
         const decimals = await asyncCatchError(contract.decimals(), NotAnERC20Token);
         checkAbortSignal(abortSignal);
         const token = new Token({ address, name, symbol, decimals });
-        await Cache.instance.saveToken(token, abortSignal);
+        await Database.instance.saveToken(token, abortSignal);
         return token;
     }
 }

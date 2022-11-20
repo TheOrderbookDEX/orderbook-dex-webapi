@@ -8,7 +8,7 @@ import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-prov
 import { resetIndexedDB } from './indexeddb';
 import { setUpSmartContracts, simulateTicks } from './smart-contracts';
 import { OrderbookDEX, orderbookDEXChainConfigs } from '../src/OrderbookDEX';
-import { Cache } from '../src/Cache';
+import { Database } from '../src/Database';
 import { listenToPriceHistoryTicksScenarios } from './scenarios/listenToPriceHistoryTicks';
 import { ChainEvents } from '../src/ChainEvents';
 import { getBlockNumber } from '@frugal-wizard/abi2ts-lib';
@@ -57,8 +57,8 @@ describe('listenToPriceHistoryTicks', function() {
                     value: scenario.testTicks.map(String),
                 });
                 addContext(this, {
-                    title: 'expectedCacheRanges',
-                    value: scenario.expectedCacheRanges,
+                    title: 'expectedDatabaseRanges',
+                    value: scenario.expectedDatabaseRanges,
                 });
                 await simulateTicks(testOrderbook, scenario.existingTicks);
                 const latestBlockNumber = await getBlockNumber();
@@ -90,7 +90,7 @@ describe('listenToPriceHistoryTicks', function() {
                 }
             });
 
-            it('should leave cache ranges as expected', async function() {
+            it('should leave database ranges as expected', async function() {
                 const abortController = new AbortController();
                 try {
                     const abortSignal = abortController.signal;
@@ -98,8 +98,8 @@ describe('listenToPriceHistoryTicks', function() {
                     await simulateTicks(testOrderbook, scenario.testTicks);
                     await ChainEvents.instance.forceUpdate();
                     await waitForListener();
-                    const ranges = await Cache.instance.getPriceHistoryRanges(testOrderbook, 0, Infinity);
-                    const expected = scenario.expectedCacheRanges(toBlockNumber);
+                    const ranges = await Database.instance.getPriceHistoryRanges(testOrderbook, 0, Infinity);
+                    const expected = scenario.expectedDatabaseRanges(toBlockNumber);
                     expect(ranges)
                         .to.have.length(expected.length);
                     for (const [ index, { fromBlock, toBlock } ] of ranges.entries()) {
