@@ -1,7 +1,6 @@
 import { use, expect } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import addContext from 'mochawesome/addContext';
-import { fetchOrderbook } from '../src/Orderbook';
 import { Chain } from '../src/Chain';
 import { fetchLast24hsPriceHistoryTicks, PriceHistoryTickInternal } from '../src/PriceHistory';
 import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-provider';
@@ -62,7 +61,7 @@ describe('fetchLast24hsPriceHistoryTicks', function() {
             });
 
             it('should return expected ticks', async function() {
-                const orderbook = await fetchOrderbook(testOrderbook);
+                const orderbook = await OrderbookDEX.instance.getOrderbook(testOrderbook);
                 const ticks: PriceHistoryTickInternal[] = [];
                 for await (const tick of fetchLast24hsPriceHistoryTicks(testOrderbook, scenario.fetchedBlock(toBlockNumber))) {
                     ticks.push(tick);

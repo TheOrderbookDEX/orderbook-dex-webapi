@@ -1,9 +1,7 @@
 import { DBSchema, IDBPDatabase, IDBPTransaction, openDB } from 'idb';
 import { Address } from './Address';
 import { OrderExecutionType, OrderStatus, OrderType } from './Order';
-import { checkAbortSignal } from './utils';
-
-// TODO move UserData persisted data here
+import { checkAbortSignal, createAbortifier } from './utils';
 
 export class Database {
     private static _instance?: Database;
@@ -17,9 +15,10 @@ export class Database {
                         db.createObjectStore('blocks', {
                             keyPath: 'blockNumber',
                         });
-                        db.createObjectStore('tokens', {
+                        const tokens = db.createObjectStore('tokens', {
                             keyPath: 'address',
                         });
+                        tokens.createIndex('tracked', ['tracked', 'address']);
                         const orderbooks = db.createObjectStore('orderbooks', {
                             keyPath: 'address',
                         });
@@ -59,66 +58,74 @@ export class Database {
     constructor(private readonly _db: IDBPDatabase<DatabaseSchemaV1>) {}
 
     async getBlockTimestamp(blockNumber: number, abortSignal?: AbortSignal) {
-        checkAbortSignal(abortSignal);
-        const block = await this._db.get('blocks', blockNumber);
-        checkAbortSignal(abortSignal);
+        const abortify = createAbortifier(abortSignal);
+        const block = await abortify(this._db.get('blocks', blockNumber));
         if (!block) throw new NotInDatabase;
         return block.timestamp;
     }
 
     async saveBlockTimestamp(blockNumber: number, timestamp: number, abortSignal?: AbortSignal) {
-        await this._db.put('blocks', { blockNumber, timestamp });
-        checkAbortSignal(abortSignal);
+        const abortify = createAbortifier(abortSignal);
+        await abortify(this._db.put('blocks', { blockNumber, timestamp }));
         return timestamp;
     }
 
+    async * getTrackedTokens(abortSignal?: AbortSignal): AsyncIterable<TokenData> {
+        const abortify = createAbortifier(abortSignal);
+        // TODO fetch the tokens in batches
+        // in indexeddb string < array, that's why we use an empty array for they query
+        const query = IDBKeyRange.bound([TrackedFlag.TRACKED], [TrackedFlag.TRACKED, []]);
+        for (const token of await abortify(this._db.getAllFromIndex('tokens', 'tracked', query))) {
+            yield token;
+        }
+    }
+
     async getToken(address: Address, abortSignal?: AbortSignal) {
-        checkAbortSignal(abortSignal);
-        const token = await this._db.get('tokens', address);
-        checkAbortSignal(abortSignal);
+        const abortify = createAbortifier(abortSignal);
+        const token = await abortify(this._db.get('tokens', address));
         if (!token) throw new NotInDatabase;
         return token;
     }
 
     async saveToken(token: TokenData, abortSignal?: AbortSignal) {
-        const { address, name, symbol, decimals } = token;
-        await this._db.put('tokens', { address, name, symbol, decimals });
-        checkAbortSignal(abortSignal);
+        const abortify = createAbortifier(abortSignal);
+        const { tracked, address, name, symbol, decimals } = token;
+        await abortify(this._db.put('tokens', { tracked, address, name, symbol, decimals }));
     }
 
     static readonly GET_ORDERBOOKS_BATCH = 10;
 
     async * getOrderbooks(factory: Address, abortSignal?: AbortSignal) {
+        const abortify = createAbortifier(abortSignal);
         const lastIndex = await this.getLastFactoryIndex(factory, abortSignal);
         if (!lastIndex) return;
         // due to how indexeddb works, we first fetch a batch then yield it
         for (let index = 0; index <= lastIndex; index += Database.GET_ORDERBOOKS_BATCH) {
             const query = IDBKeyRange.bound([factory, index], [factory, index + Database.GET_ORDERBOOKS_BATCH - 1]);
-            const orderbooks = await this._db.getAllFromIndex('orderbooks', 'byFactoryIndex', query);
-            checkAbortSignal(abortSignal);
-            for (const orderbook of orderbooks) {
+            for (const orderbook of await abortify(this._db.getAllFromIndex('orderbooks', 'byFactoryIndex', query))) {
                 yield orderbook;
             }
         }
     }
 
     async getLastFactoryIndex(factory: Address, abortSignal?: AbortSignal) {
-        const query = IDBKeyRange.bound([factory, Number.NEGATIVE_INFINITY], [factory, Number.POSITIVE_INFINITY]);
-        const cursor = await this._db.transaction('orderbooks').store.index('byFactoryIndex').openCursor(query, 'prev');
-        checkAbortSignal(abortSignal);
+        const abortify = createAbortifier(abortSignal);
+        const query = IDBKeyRange.bound([factory], [factory, Infinity]);
+        const cursor = await abortify(this._db.transaction('orderbooks').store.index('byFactoryIndex').openCursor(query, 'prev'));
         return cursor?.value.factoryIndex;
     }
 
     async getOrderbook(address: Address, abortSignal?: AbortSignal) {
-        checkAbortSignal(abortSignal);
-        const orderbook = await this._db.get('orderbooks', address);
-        checkAbortSignal(abortSignal);
+        const abortify = createAbortifier(abortSignal);
+        const orderbook = await abortify(this._db.get('orderbooks', address));
         if (!orderbook) throw new NotInDatabase;
         return orderbook;
     }
 
     async saveOrderbook(orderbook: OrderbookData, abortSignal?: AbortSignal) {
+        const abortify = createAbortifier(abortSignal);
         const {
+            tracked,
             address,
             version,
             tradedToken,
@@ -129,7 +136,8 @@ export class Database {
             factory,
             factoryIndex,
         } = orderbook;
-        await this._db.put('orderbooks', {
+        await abortify(this._db.put('orderbooks', {
+            tracked,
             address,
             version,
             tradedToken,
@@ -139,8 +147,7 @@ export class Database {
             creationBlockNumber,
             factory,
             factoryIndex,
-        });
-        checkAbortSignal(abortSignal);
+        }));
     }
 
     private async _getPriceHistoryRanges(
@@ -301,7 +308,13 @@ export interface BlockData {
     timestamp: number;
 }
 
+export enum TrackedFlag {
+    NOT_TRACKED,
+    TRACKED,
+}
+
 export interface TokenData {
+    tracked: TrackedFlag;
     address: Address;
     name: string;
     symbol: string;
@@ -309,6 +322,7 @@ export interface TokenData {
 }
 
 export interface OrderbookData {
+    tracked: TrackedFlag;
     address: Address;
     version: bigint;
     tradedToken: Address;
@@ -370,6 +384,12 @@ interface DatabaseSchemaV1 extends DBSchema {
     tokens: {
         key: TokenData['address'];
         value: TokenData;
+        indexes: {
+            tracked: [
+                TokenData['tracked'],
+                TokenData['address'],
+            ];
+        };
     },
     orderbooks: {
         key: OrderbookData['address'];

@@ -3,7 +3,7 @@ import { ChainInternal, fetchBlockTimestamp } from './Chain';
 import { GenericEventListener } from './event-types';
 import { EventTargetX } from './EventTargetX';
 import { checkAbortSignal, isAbortReason } from './utils';
-import { fetchOrderbook, OrderbookInternal } from './Orderbook';
+import { fetchOrderbookData } from './Orderbook';
 import { Database } from './Database';
 import { ContractEvent, getBlockNumber } from '@frugal-wizard/abi2ts-lib';
 import { ChainEvents } from './ChainEvents';
@@ -270,7 +270,7 @@ export function listenToPriceHistoryTicks(orderbook: Address, abortSignal: Abort
 }
 
 export async function fetchPriceHistoryBarAtBlock(orderbook: Address, timeFrame: number, toBlock: number, abortSignal?: AbortSignal) {
-    const { creationBlockNumber } = await fetchOrderbook(orderbook) as OrderbookInternal;
+    const { creationBlockNumber } = await fetchOrderbookData(orderbook);
     let blockTimestamp = await fetchBlockTimestamp(toBlock, abortSignal);
     const barTimestamp = blockTimestamp - blockTimestamp % timeFrame;
     let barTicks: PriceHistoryTickInternal[] = [];
@@ -300,7 +300,7 @@ export async function fetchPriceHistoryBarAtBlock(orderbook: Address, timeFrame:
 }
 
 export async function* fetchAllPriceHistoryBars(orderbook: Address, timeFrame: number, abortSignal?: AbortSignal) {
-    const { creationBlockNumber } = await fetchOrderbook(orderbook) as OrderbookInternal;
+    const { creationBlockNumber } = await fetchOrderbookData(orderbook);
     let pendingBar: PriceHistoryBar | undefined;
     let toBlock = await getBlockNumber();
     while (toBlock >= creationBlockNumber) {
@@ -353,7 +353,7 @@ export async function* fetchAllPriceHistoryBars(orderbook: Address, timeFrame: n
 }
 
 export async function* fetchLast24hsPriceHistoryTicks(orderbook: Address, toBlock: number, abortSignal?: AbortSignal) {
-    const { creationBlockNumber } = await fetchOrderbook(orderbook) as OrderbookInternal;
+    const { creationBlockNumber } = await fetchOrderbookData(orderbook);
     const now = await fetchBlockTimestamp(toBlock, abortSignal);
     const aDayAgo = now - (TimeFrame.DAY as number);
     while (toBlock >= creationBlockNumber) {

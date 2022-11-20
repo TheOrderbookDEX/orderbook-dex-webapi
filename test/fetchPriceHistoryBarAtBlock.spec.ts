@@ -1,7 +1,6 @@
 import { use, expect } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import addContext from 'mochawesome/addContext';
-import { fetchOrderbook } from '../src/Orderbook';
 import { Chain } from '../src/Chain';
 import { fetchPriceHistoryBarAtBlock } from '../src/PriceHistory';
 import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-provider';
@@ -50,7 +49,7 @@ describe('fetchPriceHistoryBarAtBlock', function() {
 
             it('should return expected bar', async function() {
                 const blockNumber = await getBlockNumber();
-                const orderbook = await fetchOrderbook(testOrderbook);
+                const orderbook = await OrderbookDEX.instance.getOrderbook(testOrderbook);
                 const bar = await fetchPriceHistoryBarAtBlock(testOrderbook, testTimeFrame, blockNumber);
                 if (scenario.expectedBar){
                     expect(bar)

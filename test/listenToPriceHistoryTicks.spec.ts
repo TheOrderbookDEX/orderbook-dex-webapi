@@ -1,7 +1,6 @@
 import { use, expect } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import addContext from 'mochawesome/addContext';
-import { fetchOrderbook } from '../src/Orderbook';
 import { Chain } from '../src/Chain';
 import { fetchPriceHistoryTicks, listenToPriceHistoryTicks, PriceHistoryTickInternal } from '../src/PriceHistory';
 import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-provider';
@@ -73,7 +72,7 @@ describe('listenToPriceHistoryTicks', function() {
                 const abortController = new AbortController();
                 try {
                     const abortSignal = abortController.signal;
-                    const orderbook = await fetchOrderbook(testOrderbook);
+                    const orderbook = await OrderbookDEX.instance.getOrderbook(testOrderbook);
                     const ticks: PriceHistoryTickInternal[] = [];
                     const waitForListener = listenToPriceHistoryTicks(testOrderbook, abortSignal, tick => ticks.push(tick));
                     await simulateTicks(testOrderbook, scenario.testTicks);

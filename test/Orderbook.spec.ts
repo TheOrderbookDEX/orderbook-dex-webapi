@@ -1,17 +1,15 @@
 import { getBlockTimestamp } from '@frugal-wizard/abi2ts-lib';
 import { use, expect } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
-import { Orderbook, OrderbookDEX, OrderType, PricePointAddedEvent, PricePointRemovedEvent, PricePointsEventType, PricePointUpdatedEvent, TimeFrame } from '../src';
+import { OrderbookDEX, OrderType, PricePointAddedEvent, PricePointRemovedEvent, PricePointsEventType, PricePointUpdatedEvent, TimeFrame } from '../src';
 import { Chain } from '../src/Chain';
 import { ChainEvents } from '../src/ChainEvents';
 import { PriceChangedEvent, PriceTickerEventType, PriceTickerInternal } from '../src/PriceTicker';
 import { now } from '../src/time';
-import { UserData } from '../src/UserData';
 import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-provider';
 import { resetIndexedDB } from './indexeddb';
-import { fillOrders, placeOrders, setUpSmartContracts, simulatePriceHistory, simulatePricePoints, simulateTicks } from './smart-contracts';
+import { fillOrders, placeOrders, setUpSmartContracts, simulatePriceHistory, simulatePricePoints, simulateTicks, testContracts } from './smart-contracts';
 import { setTime, setUpTimeMock, tearDownTimeMock } from './time-mock';
-import { asyncFirst } from './utils';
 
 use(chaiAsPromised);
 
@@ -43,11 +41,9 @@ describe('Orderbook', function() {
         await Chain.connect();
         await setUpSmartContracts();
         await OrderbookDEX.connect();
-        await UserData.load();
     });
 
     afterEach(async function() {
-        UserData.unload();
         OrderbookDEX.disconnect();
         Chain.disconnect();
         await tearDownEthereumProvider();
@@ -56,7 +52,7 @@ describe('Orderbook', function() {
 
     describe('getPricePoints', function() {
         beforeEach(async function() {
-            const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+            const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
             await simulatePricePoints(orderbook.address, testPricePoints);
             await ChainEvents.instance.forceUpdate();
         });
@@ -64,7 +60,7 @@ describe('Orderbook', function() {
         describe('not limiting results', function() {
             describe('the returned object', function() {
                 it('should provide all the current price points', async function() {
-                    const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+                    const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
                     const pricePoints = await orderbook.getPricePoints(Infinity);
                     expect(pricePoints.sell.map(({ price, available }) => ({ price, available })))
                         .to.be.deep.equal(
@@ -87,7 +83,7 @@ describe('Orderbook', function() {
 
             describe('after adding a sell price point', function() {
                 it('should emit a PricePointAddedEvent', async function() {
-                    const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+                    const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
                     const pricePoints = await orderbook.getPricePoints(Infinity);
                     const abortController = new AbortController();
                     let event: PricePointAddedEvent | undefined;
@@ -114,7 +110,7 @@ describe('Orderbook', function() {
 
             describe('after adding a buy price point', function() {
                 it('should emit a PricePointAddedEvent', async function() {
-                    const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+                    const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
                     const pricePoints = await orderbook.getPricePoints(Infinity);
                     const abortController = new AbortController();
                     let event: PricePointAddedEvent | undefined;
@@ -141,112 +137,104 @@ describe('Orderbook', function() {
 
             describe('after updating a sell price point', function() {
                 it('should emit a PricePointUpdatedEvent', async function() {
-                    for await (const orderbook of UserData.instance.savedOrderbooks()) {
-                        const pricePoints = await orderbook.getPricePoints(Infinity);
-                        const abortController = new AbortController();
-                        let event: PricePointUpdatedEvent | undefined;
-                        pricePoints.addEventListener(PricePointsEventType.PRICE_POINT_UPDATED, e => event = e, { signal: abortController.signal });
-                        try {
-                            const [[ price, available ]] = [...testPricePoints.sell.entries()];
-                            await placeOrders(orderbook.address, [{ orderType: 0, price, amount: 1n }]);
-                            await ChainEvents.instance.forceUpdate();
-                            expect(event)
-                                .to.exist;
-                            if (event) {
-                                expect(event.orderType)
-                                    .to.be.equal(OrderType.SELL);
-                                expect(event.price)
-                                    .to.be.equal(price * orderbook.priceTick);
-                                expect(event.available)
-                                    .to.be.equal(available + 1n);
-                            }
-                        } finally {
-                            abortController.abort();
+                    const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
+                    const pricePoints = await orderbook.getPricePoints(Infinity);
+                    const abortController = new AbortController();
+                    let event: PricePointUpdatedEvent | undefined;
+                    pricePoints.addEventListener(PricePointsEventType.PRICE_POINT_UPDATED, e => event = e, { signal: abortController.signal });
+                    try {
+                        const [[ price, available ]] = [...testPricePoints.sell.entries()];
+                        await placeOrders(orderbook.address, [{ orderType: 0, price, amount: 1n }]);
+                        await ChainEvents.instance.forceUpdate();
+                        expect(event)
+                            .to.exist;
+                        if (event) {
+                            expect(event.orderType)
+                                .to.be.equal(OrderType.SELL);
+                            expect(event.price)
+                                .to.be.equal(price * orderbook.priceTick);
+                            expect(event.available)
+                                .to.be.equal(available + 1n);
                         }
-                        break;
+                    } finally {
+                        abortController.abort();
                     }
                 });
             });
 
             describe('after updating a buy price point', function() {
                 it('should emit a PricePointUpdatedEvent', async function() {
-                    for await (const orderbook of UserData.instance.savedOrderbooks()) {
-                        const pricePoints = await orderbook.getPricePoints(Infinity);
-                        const abortController = new AbortController();
-                        let event: PricePointUpdatedEvent | undefined;
-                        pricePoints.addEventListener(PricePointsEventType.PRICE_POINT_UPDATED, e => event = e, { signal: abortController.signal });
-                        try {
-                            const [[ price, available ]] = [...testPricePoints.buy.entries()];
-                            await placeOrders(orderbook.address, [{ orderType: 1, price, amount: 1n }]);
-                            await ChainEvents.instance.forceUpdate();
-                            expect(event)
-                                .to.exist;
-                            if (event) {
-                                expect(event.orderType)
-                                    .to.be.equal(OrderType.BUY);
-                                expect(event.price)
-                                    .to.be.equal(price * orderbook.priceTick);
-                                expect(event.available)
-                                    .to.be.equal(available + 1n);
-                            }
-                        } finally {
-                            abortController.abort();
+                    const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
+                    const pricePoints = await orderbook.getPricePoints(Infinity);
+                    const abortController = new AbortController();
+                    let event: PricePointUpdatedEvent | undefined;
+                    pricePoints.addEventListener(PricePointsEventType.PRICE_POINT_UPDATED, e => event = e, { signal: abortController.signal });
+                    try {
+                        const [[ price, available ]] = [...testPricePoints.buy.entries()];
+                        await placeOrders(orderbook.address, [{ orderType: 1, price, amount: 1n }]);
+                        await ChainEvents.instance.forceUpdate();
+                        expect(event)
+                            .to.exist;
+                        if (event) {
+                            expect(event.orderType)
+                                .to.be.equal(OrderType.BUY);
+                            expect(event.price)
+                                .to.be.equal(price * orderbook.priceTick);
+                            expect(event.available)
+                                .to.be.equal(available + 1n);
                         }
-                        break;
+                    } finally {
+                        abortController.abort();
                     }
                 });
             });
 
             describe('after removing a sell price point', function() {
                 it('should emit a PricePointRemovedEvent', async function() {
-                    for await (const orderbook of UserData.instance.savedOrderbooks()) {
-                        const pricePoints = await orderbook.getPricePoints(Infinity);
-                        const abortController = new AbortController();
-                        let event: PricePointRemovedEvent | undefined;
-                        pricePoints.addEventListener(PricePointsEventType.PRICE_POINT_REMOVED, e => event = e, { signal: abortController.signal });
-                        try {
-                            const [ [ removedPrice, amountToFill ] ] = [...testPricePoints.sell.entries()];
-                            await fillOrders(orderbook.address, 0, amountToFill);
-                            await ChainEvents.instance.forceUpdate();
-                            expect(event)
-                                .to.exist;
-                            if (event) {
-                                expect(event.orderType)
-                                    .to.be.equal(OrderType.SELL);
-                                expect(event.price)
-                                    .to.be.equal(removedPrice * orderbook.priceTick);
-                            }
-                        } finally {
-                            abortController.abort();
+                    const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
+                    const pricePoints = await orderbook.getPricePoints(Infinity);
+                    const abortController = new AbortController();
+                    let event: PricePointRemovedEvent | undefined;
+                    pricePoints.addEventListener(PricePointsEventType.PRICE_POINT_REMOVED, e => event = e, { signal: abortController.signal });
+                    try {
+                        const [ [ removedPrice, amountToFill ] ] = [...testPricePoints.sell.entries()];
+                        await fillOrders(orderbook.address, 0, amountToFill);
+                        await ChainEvents.instance.forceUpdate();
+                        expect(event)
+                            .to.exist;
+                        if (event) {
+                            expect(event.orderType)
+                                .to.be.equal(OrderType.SELL);
+                            expect(event.price)
+                                .to.be.equal(removedPrice * orderbook.priceTick);
                         }
-                        break;
+                    } finally {
+                        abortController.abort();
                     }
                 });
             });
 
             describe('after removing a buy price point', function() {
                 it('should emit a PricePointRemovedEvent', async function() {
-                    for await (const orderbook of UserData.instance.savedOrderbooks()) {
-                        const pricePoints = await orderbook.getPricePoints(Infinity);
-                        const abortController = new AbortController();
-                        let event: PricePointRemovedEvent | undefined;
-                        pricePoints.addEventListener(PricePointsEventType.PRICE_POINT_REMOVED, e => event = e, { signal: abortController.signal });
-                        try {
-                            const [ [ removedPrice, amountToFill ] ] = [...testPricePoints.buy.entries()];
-                            await fillOrders(orderbook.address, 1, amountToFill);
-                            await ChainEvents.instance.forceUpdate();
-                            expect(event)
-                                .to.exist;
-                            if (event) {
-                                expect(event.orderType)
-                                    .to.be.equal(OrderType.BUY);
-                                expect(event.price)
-                                    .to.be.equal(removedPrice * orderbook.priceTick);
-                            }
-                        } finally {
-                            abortController.abort();
+                    const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
+                    const pricePoints = await orderbook.getPricePoints(Infinity);
+                    const abortController = new AbortController();
+                    let event: PricePointRemovedEvent | undefined;
+                    pricePoints.addEventListener(PricePointsEventType.PRICE_POINT_REMOVED, e => event = e, { signal: abortController.signal });
+                    try {
+                        const [ [ removedPrice, amountToFill ] ] = [...testPricePoints.buy.entries()];
+                        await fillOrders(orderbook.address, 1, amountToFill);
+                        await ChainEvents.instance.forceUpdate();
+                        expect(event)
+                            .to.exist;
+                        if (event) {
+                            expect(event.orderType)
+                                .to.be.equal(OrderType.BUY);
+                            expect(event.price)
+                                .to.be.equal(removedPrice * orderbook.priceTick);
                         }
-                        break;
+                    } finally {
+                        abortController.abort();
                     }
                 });
             });
@@ -255,241 +243,223 @@ describe('Orderbook', function() {
         describe('limiting results', function() {
             describe('the returned object', function() {
                 it('should provide the current price points capped at limit', async function() {
-                    for await (const orderbook of UserData.instance.savedOrderbooks()) {
-                        const pricePoints = await orderbook.getPricePoints(2);
-                        expect(pricePoints.sell.map(({ price, available }) => ({ price, available })))
-                            .to.be.deep.equal(
-                                [...testPricePoints.sell.entries()].slice(0, 2)
-                                    .map(([ price, available ]) => ({
-                                        price: price * orderbook.priceTick,
-                                        available
-                                    }))
-                            );
-                        expect(pricePoints.buy.map(({ price, available }) => ({ price, available })))
-                            .to.be.deep.equal(
-                                [...testPricePoints.buy.entries()].slice(0, 2)
-                                    .map(([ price, available ]) => ({
-                                        price: price * orderbook.priceTick,
-                                        available
-                                    }))
-                            );
-                        break;
-                    }
+                    const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
+                    const pricePoints = await orderbook.getPricePoints(2);
+                    expect(pricePoints.sell.map(({ price, available }) => ({ price, available })))
+                        .to.be.deep.equal(
+                            [...testPricePoints.sell.entries()].slice(0, 2)
+                                .map(([ price, available ]) => ({
+                                    price: price * orderbook.priceTick,
+                                    available
+                                }))
+                        );
+                    expect(pricePoints.buy.map(({ price, available }) => ({ price, available })))
+                        .to.be.deep.equal(
+                            [...testPricePoints.buy.entries()].slice(0, 2)
+                                .map(([ price, available ]) => ({
+                                    price: price * orderbook.priceTick,
+                                    available
+                                }))
+                        );
                 });
             });
 
             describe('after adding a sell price point', function() {
                 it('should emit a PricePointAddedEvent', async function() {
-                    for await (const orderbook of UserData.instance.savedOrderbooks()) {
-                        const pricePoints = await orderbook.getPricePoints(2);
-                        const abortController = new AbortController();
-                        let event: PricePointAddedEvent | undefined;
-                        pricePoints.addEventListener(PricePointsEventType.PRICE_POINT_ADDED, e => event = e, { signal: abortController.signal });
-                        try {
-                            const price = [...testPricePoints.sell.keys()][0] + 1n;
-                            await placeOrders(orderbook.address, [{ orderType: 0, price, amount: 1n }]);
-                            await ChainEvents.instance.forceUpdate();
-                            expect(event)
-                                .to.exist;
-                            if (event) {
-                                expect(event.orderType)
-                                    .to.be.equal(OrderType.SELL);
-                                expect(event.price)
-                                    .to.be.equal(price * orderbook.priceTick);
-                                expect(event.available)
-                                    .to.be.equal(1n);
-                            }
-                        } finally {
-                            abortController.abort();
+                    const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
+                    const pricePoints = await orderbook.getPricePoints(2);
+                    const abortController = new AbortController();
+                    let event: PricePointAddedEvent | undefined;
+                    pricePoints.addEventListener(PricePointsEventType.PRICE_POINT_ADDED, e => event = e, { signal: abortController.signal });
+                    try {
+                        const price = [...testPricePoints.sell.keys()][0] + 1n;
+                        await placeOrders(orderbook.address, [{ orderType: 0, price, amount: 1n }]);
+                        await ChainEvents.instance.forceUpdate();
+                        expect(event)
+                            .to.exist;
+                        if (event) {
+                            expect(event.orderType)
+                                .to.be.equal(OrderType.SELL);
+                            expect(event.price)
+                                .to.be.equal(price * orderbook.priceTick);
+                            expect(event.available)
+                                .to.be.equal(1n);
                         }
-                        break;
+                    } finally {
+                        abortController.abort();
                     }
                 });
 
                 it('should emit a PricePointRemovedEvent', async function() {
-                    for await (const orderbook of UserData.instance.savedOrderbooks()) {
-                        const pricePoints = await orderbook.getPricePoints(2);
-                        const abortController = new AbortController();
-                        let event: PricePointRemovedEvent | undefined;
-                        pricePoints.addEventListener(PricePointsEventType.PRICE_POINT_REMOVED, e => event = e, { signal: abortController.signal });
-                        try {
-                            const prices = [...testPricePoints.sell.keys()];
-                            await placeOrders(orderbook.address, [{ orderType: 0, price: prices[0] + 1n, amount: 1n }]);
-                            await ChainEvents.instance.forceUpdate();
-                            expect(event)
-                                .to.exist;
-                            if (event) {
-                                expect(event.orderType)
-                                    .to.be.equal(OrderType.SELL);
-                                expect(event.price)
-                                    .to.be.equal(prices[1] * orderbook.priceTick);
-                            }
-                        } finally {
-                            abortController.abort();
+                    const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
+                    const pricePoints = await orderbook.getPricePoints(2);
+                    const abortController = new AbortController();
+                    let event: PricePointRemovedEvent | undefined;
+                    pricePoints.addEventListener(PricePointsEventType.PRICE_POINT_REMOVED, e => event = e, { signal: abortController.signal });
+                    try {
+                        const prices = [...testPricePoints.sell.keys()];
+                        await placeOrders(orderbook.address, [{ orderType: 0, price: prices[0] + 1n, amount: 1n }]);
+                        await ChainEvents.instance.forceUpdate();
+                        expect(event)
+                            .to.exist;
+                        if (event) {
+                            expect(event.orderType)
+                                .to.be.equal(OrderType.SELL);
+                            expect(event.price)
+                                .to.be.equal(prices[1] * orderbook.priceTick);
                         }
-                        break;
+                    } finally {
+                        abortController.abort();
                     }
                 });
             });
 
             describe('after adding a buy price point', function() {
                 it('should emit a PricePointAddedEvent', async function() {
-                    for await (const orderbook of UserData.instance.savedOrderbooks()) {
-                        const pricePoints = await orderbook.getPricePoints(2);
-                        const abortController = new AbortController();
-                        let event: PricePointAddedEvent | undefined;
-                        pricePoints.addEventListener(PricePointsEventType.PRICE_POINT_ADDED, e => event = e, { signal: abortController.signal });
-                        try {
-                            const price = [...testPricePoints.buy.keys()][0] - 1n;
-                            await placeOrders(orderbook.address, [{ orderType: 1, price, amount: 1n }]);
-                            await ChainEvents.instance.forceUpdate();
-                            expect(event)
-                                .to.exist;
-                            if (event) {
-                                expect(event.orderType)
-                                    .to.be.equal(OrderType.BUY);
-                                expect(event.price)
-                                    .to.be.equal(price * orderbook.priceTick);
-                                expect(event.available)
-                                    .to.be.equal(1n);
-                            }
-                        } finally {
-                            abortController.abort();
+                    const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
+                    const pricePoints = await orderbook.getPricePoints(2);
+                    const abortController = new AbortController();
+                    let event: PricePointAddedEvent | undefined;
+                    pricePoints.addEventListener(PricePointsEventType.PRICE_POINT_ADDED, e => event = e, { signal: abortController.signal });
+                    try {
+                        const price = [...testPricePoints.buy.keys()][0] - 1n;
+                        await placeOrders(orderbook.address, [{ orderType: 1, price, amount: 1n }]);
+                        await ChainEvents.instance.forceUpdate();
+                        expect(event)
+                            .to.exist;
+                        if (event) {
+                            expect(event.orderType)
+                                .to.be.equal(OrderType.BUY);
+                            expect(event.price)
+                                .to.be.equal(price * orderbook.priceTick);
+                            expect(event.available)
+                                .to.be.equal(1n);
                         }
-                        break;
+                    } finally {
+                        abortController.abort();
                     }
                 });
 
                 it('should emit a PricePointRemovedEvent', async function() {
-                    for await (const orderbook of UserData.instance.savedOrderbooks()) {
-                        const pricePoints = await orderbook.getPricePoints(2);
-                        const abortController = new AbortController();
-                        let event: PricePointRemovedEvent | undefined;
-                        pricePoints.addEventListener(PricePointsEventType.PRICE_POINT_REMOVED, e => event = e, { signal: abortController.signal });
-                        try {
-                            const prices = [...testPricePoints.buy.keys()];
-                            await placeOrders(orderbook.address, [{ orderType: 1, price: prices[0] - 1n, amount: 1n }]);
-                            await ChainEvents.instance.forceUpdate();
-                            expect(event)
-                                .to.exist;
-                            if (event) {
-                                expect(event.orderType)
-                                    .to.be.equal(OrderType.BUY);
-                                expect(event.price)
-                                    .to.be.equal(prices[1] * orderbook.priceTick);
-                            }
-                        } finally {
-                            abortController.abort();
+                    const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
+                    const pricePoints = await orderbook.getPricePoints(2);
+                    const abortController = new AbortController();
+                    let event: PricePointRemovedEvent | undefined;
+                    pricePoints.addEventListener(PricePointsEventType.PRICE_POINT_REMOVED, e => event = e, { signal: abortController.signal });
+                    try {
+                        const prices = [...testPricePoints.buy.keys()];
+                        await placeOrders(orderbook.address, [{ orderType: 1, price: prices[0] - 1n, amount: 1n }]);
+                        await ChainEvents.instance.forceUpdate();
+                        expect(event)
+                            .to.exist;
+                        if (event) {
+                            expect(event.orderType)
+                                .to.be.equal(OrderType.BUY);
+                            expect(event.price)
+                                .to.be.equal(prices[1] * orderbook.priceTick);
                         }
-                        break;
+                    } finally {
+                        abortController.abort();
                     }
                 });
             });
 
             describe('after removing a sell price point', function() {
                 it('should emit a PricePointRemovedEvent', async function() {
-                    for await (const orderbook of UserData.instance.savedOrderbooks()) {
-                        const pricePoints = await orderbook.getPricePoints(2);
-                        const abortController = new AbortController();
-                        let event: PricePointRemovedEvent | undefined;
-                        pricePoints.addEventListener(PricePointsEventType.PRICE_POINT_REMOVED, e => event = e, { signal: abortController.signal });
-                        try {
-                            const [ [ removedPrice, amountToFill ] ] = [...testPricePoints.sell.entries()];
-                            await fillOrders(orderbook.address, 0, amountToFill);
-                            await ChainEvents.instance.forceUpdate();
-                            expect(event)
-                                .to.exist;
-                            if (event) {
-                                expect(event.orderType)
-                                    .to.be.equal(OrderType.SELL);
-                                expect(event.price)
-                                    .to.be.equal(removedPrice * orderbook.priceTick);
-                            }
-                        } finally {
-                            abortController.abort();
+                    const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
+                    const pricePoints = await orderbook.getPricePoints(2);
+                    const abortController = new AbortController();
+                    let event: PricePointRemovedEvent | undefined;
+                    pricePoints.addEventListener(PricePointsEventType.PRICE_POINT_REMOVED, e => event = e, { signal: abortController.signal });
+                    try {
+                        const [ [ removedPrice, amountToFill ] ] = [...testPricePoints.sell.entries()];
+                        await fillOrders(orderbook.address, 0, amountToFill);
+                        await ChainEvents.instance.forceUpdate();
+                        expect(event)
+                            .to.exist;
+                        if (event) {
+                            expect(event.orderType)
+                                .to.be.equal(OrderType.SELL);
+                            expect(event.price)
+                                .to.be.equal(removedPrice * orderbook.priceTick);
                         }
-                        break;
+                    } finally {
+                        abortController.abort();
                     }
                 });
 
                 it('should emit a PricePointAddedEvent', async function() {
-                    for await (const orderbook of UserData.instance.savedOrderbooks()) {
-                        const pricePoints = await orderbook.getPricePoints(2);
-                        const abortController = new AbortController();
-                        let event: PricePointAddedEvent | undefined;
-                        pricePoints.addEventListener(PricePointsEventType.PRICE_POINT_ADDED, e => event = e, { signal: abortController.signal });
-                        try {
-                            const [ [ , amountToFill ], , [ addedPrice, addedAvailable ] ] = [...testPricePoints.sell.entries()];
-                            await fillOrders(orderbook.address, 0, amountToFill);
-                            await ChainEvents.instance.forceUpdate();
-                            expect(event)
-                                .to.exist;
-                            if (event) {
-                                expect(event.orderType)
-                                    .to.be.equal(OrderType.SELL);
-                                expect(event.price)
-                                    .to.be.equal(addedPrice * orderbook.priceTick);
-                                expect(event.available)
-                                    .to.be.equal(addedAvailable);
-                            }
-                        } finally {
-                            abortController.abort();
+                    const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
+                    const pricePoints = await orderbook.getPricePoints(2);
+                    const abortController = new AbortController();
+                    let event: PricePointAddedEvent | undefined;
+                    pricePoints.addEventListener(PricePointsEventType.PRICE_POINT_ADDED, e => event = e, { signal: abortController.signal });
+                    try {
+                        const [ [ , amountToFill ], , [ addedPrice, addedAvailable ] ] = [...testPricePoints.sell.entries()];
+                        await fillOrders(orderbook.address, 0, amountToFill);
+                        await ChainEvents.instance.forceUpdate();
+                        expect(event)
+                            .to.exist;
+                        if (event) {
+                            expect(event.orderType)
+                                .to.be.equal(OrderType.SELL);
+                            expect(event.price)
+                                .to.be.equal(addedPrice * orderbook.priceTick);
+                            expect(event.available)
+                                .to.be.equal(addedAvailable);
                         }
-                        break;
+                    } finally {
+                        abortController.abort();
                     }
                 });
             });
 
             describe('after removing a buy price point', function() {
                 it('should emit a PricePointRemovedEvent', async function() {
-                    for await (const orderbook of UserData.instance.savedOrderbooks()) {
-                        const pricePoints = await orderbook.getPricePoints(2);
-                        const abortController = new AbortController();
-                        let event: PricePointRemovedEvent | undefined;
-                        pricePoints.addEventListener(PricePointsEventType.PRICE_POINT_REMOVED, e => event = e, { signal: abortController.signal });
-                        try {
-                            const [ [ removedPrice, amountToFill ] ] = [...testPricePoints.buy.entries()];
-                            await fillOrders(orderbook.address, 1, amountToFill);
-                            await ChainEvents.instance.forceUpdate();
-                            expect(event)
-                                .to.exist;
-                            if (event) {
-                                expect(event.orderType)
-                                    .to.be.equal(OrderType.BUY);
-                                expect(event.price)
-                                    .to.be.equal(removedPrice * orderbook.priceTick);
-                            }
-                        } finally {
-                            abortController.abort();
+                    const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
+                    const pricePoints = await orderbook.getPricePoints(2);
+                    const abortController = new AbortController();
+                    let event: PricePointRemovedEvent | undefined;
+                    pricePoints.addEventListener(PricePointsEventType.PRICE_POINT_REMOVED, e => event = e, { signal: abortController.signal });
+                    try {
+                        const [ [ removedPrice, amountToFill ] ] = [...testPricePoints.buy.entries()];
+                        await fillOrders(orderbook.address, 1, amountToFill);
+                        await ChainEvents.instance.forceUpdate();
+                        expect(event)
+                            .to.exist;
+                        if (event) {
+                            expect(event.orderType)
+                                .to.be.equal(OrderType.BUY);
+                            expect(event.price)
+                                .to.be.equal(removedPrice * orderbook.priceTick);
                         }
-                        break;
+                    } finally {
+                        abortController.abort();
                     }
                 });
 
                 it('should emit a PricePointAddedEvent', async function() {
-                    for await (const orderbook of UserData.instance.savedOrderbooks()) {
-                        const pricePoints = await orderbook.getPricePoints(2);
-                        const abortController = new AbortController();
-                        let event: PricePointAddedEvent | undefined;
-                        pricePoints.addEventListener(PricePointsEventType.PRICE_POINT_ADDED, e => event = e, { signal: abortController.signal });
-                        try {
-                            const [ [ , amountToFill ], , [ addedPrice, addedAvailable ] ] = [...testPricePoints.buy.entries()];
-                            await fillOrders(orderbook.address, 1, amountToFill);
-                            await ChainEvents.instance.forceUpdate();
-                            expect(event)
-                                .to.exist;
-                            if (event) {
-                                expect(event.orderType)
-                                    .to.be.equal(OrderType.BUY);
-                                expect(event.price)
-                                    .to.be.equal(addedPrice * orderbook.priceTick);
-                                expect(event.available)
-                                    .to.be.equal(addedAvailable);
-                            }
-                        } finally {
-                            abortController.abort();
+                    const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
+                    const pricePoints = await orderbook.getPricePoints(2);
+                    const abortController = new AbortController();
+                    let event: PricePointAddedEvent | undefined;
+                    pricePoints.addEventListener(PricePointsEventType.PRICE_POINT_ADDED, e => event = e, { signal: abortController.signal });
+                    try {
+                        const [ [ , amountToFill ], , [ addedPrice, addedAvailable ] ] = [...testPricePoints.buy.entries()];
+                        await fillOrders(orderbook.address, 1, amountToFill);
+                        await ChainEvents.instance.forceUpdate();
+                        expect(event)
+                            .to.exist;
+                        if (event) {
+                            expect(event.orderType)
+                                .to.be.equal(OrderType.BUY);
+                            expect(event.price)
+                                .to.be.equal(addedPrice * orderbook.priceTick);
+                            expect(event.available)
+                                .to.be.equal(addedAvailable);
                         }
-                        break;
+                    } finally {
+                        abortController.abort();
                     }
                 });
             });
@@ -499,12 +469,12 @@ describe('Orderbook', function() {
     describe('getPriceHistory', function() {
         describe('getting for the first time', function() {
             beforeEach(async function() {
-                const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+                const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
                 await simulatePriceHistory(orderbook.address, TimeFrame.MINUTES_15 as number, testPriceHistory);
             });
 
             it('should return the current price history', async function() {
-                const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+                const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
                 const priceHistory = orderbook.getPriceHistory(TimeFrame.MINUTES_15);
                 let index = 0;
                 for await (const bar of priceHistory) {
@@ -528,7 +498,7 @@ describe('Orderbook', function() {
 
         describe('getting for a second time', function() {
             beforeEach(async function() {
-                const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+                const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
                 await simulatePriceHistory(orderbook.address, TimeFrame.MINUTES_15 as number, testPriceHistory);
                 const priceHistory = orderbook.getPriceHistory(TimeFrame.MINUTES_15);
                 // eslint-disable-next-line @typescript-eslint/no-unused-vars, no-empty
@@ -536,7 +506,7 @@ describe('Orderbook', function() {
             });
 
             it('should return the current price history', async function() {
-                const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+                const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
                 const priceHistory = orderbook.getPriceHistory(TimeFrame.MINUTES_15);
                 let index = 0;
                 for await (const bar of priceHistory) {
@@ -570,14 +540,14 @@ describe('Orderbook', function() {
 
         describe('with no price ticks', function() {
             it('should provide the expected lastPrice', async function() {
-                const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+                const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
                 const priceTicker = await orderbook.getPriceTicker();
                 expect(priceTicker.lastPrice)
                     .to.be.undefined;
             });
 
             it('should provide the expected priceChange', async function() {
-                const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+                const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
                 const priceTicker = await orderbook.getPriceTicker();
                 expect(priceTicker.priceChange)
                     .to.be.undefined;
@@ -586,20 +556,20 @@ describe('Orderbook', function() {
 
         describe('with price ticks all within the same day', function() {
             beforeEach(async function() {
-                const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+                const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
                 await simulateTicks(orderbook.address, testTicks);
                 setTime(await getBlockTimestamp());
             });
 
             it('should provide the expected lastPrice', async function() {
-                const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+                const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
                 const priceTicker = await orderbook.getPriceTicker();
                 expect(priceTicker.lastPrice)
                     .to.be.equal(testTicks[testTicks.length - 1] * orderbook.priceTick);
             });
 
             it('should provide the expected priceChange', async function() {
-                const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+                const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
                 const priceTicker = await orderbook.getPriceTicker();
                 expect(priceTicker.priceChange)
                     .to.be.undefined;
@@ -608,20 +578,20 @@ describe('Orderbook', function() {
 
         describe('with price ticks every 24hs', function() {
             beforeEach(async function() {
-                const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+                const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
                 await simulateTicks(orderbook.address, testTicks, TimeFrame.DAY as number + 1);
                 setTime(await getBlockTimestamp());
             });
 
             it('should provide the expected lastPrice', async function() {
-                const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+                const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
                 const priceTicker = await orderbook.getPriceTicker();
                 expect(priceTicker.lastPrice)
                     .to.be.equal(testTicks[testTicks.length - 1] * orderbook.priceTick);
             });
 
             it('should provide the expected priceChange', async function() {
-                const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+                const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
                 const priceTicker = await orderbook.getPriceTicker();
                 expect(priceTicker.priceChange)
                     .to.be.equal(Number(testTicks[testTicks.length - 1] * 1000000n / testTicks[testTicks.length - 2]) / 1000000 - 1);
@@ -630,20 +600,20 @@ describe('Orderbook', function() {
 
         describe('with price ticks every 12hs', function() {
             beforeEach(async function() {
-                const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+                const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
                 await simulateTicks(orderbook.address, testTicks, TimeFrame.DAY as number / 2 + 1);
                 setTime(await getBlockTimestamp());
             });
 
             it('should provide the expected lastPrice', async function() {
-                const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+                const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
                 const priceTicker = await orderbook.getPriceTicker();
                 expect(priceTicker.lastPrice)
                     .to.be.equal(testTicks[testTicks.length - 1] * orderbook.priceTick);
             });
 
             it('should provide the expected priceChange', async function() {
-                const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+                const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
                 const priceTicker = await orderbook.getPriceTicker();
                 expect(priceTicker.priceChange)
                     .to.be.equal(Number(testTicks[testTicks.length - 1] * 1000000n / testTicks[testTicks.length - 3]) / 1000000 - 1);
@@ -654,7 +624,7 @@ describe('Orderbook', function() {
             it('should emit a PriceChangedEvent for each tick', async function() {
                 const abortController = new AbortController();
                 try {
-                    const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+                    const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
                     const priceTicker = await orderbook.getPriceTicker() as PriceTickerInternal;
                     const events = new Array<PriceChangedEvent>();
                     priceTicker.addEventListener(PriceTickerEventType.PRICE_CHANGED, event => events.push(event), { signal: abortController.signal });
@@ -675,7 +645,7 @@ describe('Orderbook', function() {
 
         describe('when a new tick becomes the price 24hs ago', function() {
             beforeEach(async function() {
-                const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+                const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
                 await simulateTicks(orderbook.address, testTicks.slice(0, 4), TimeFrame.DAY as number / 4 + 1);
                 setTime(await getBlockTimestamp());
             });
@@ -683,7 +653,7 @@ describe('Orderbook', function() {
             it('should emit a PriceChangedEvent with the new priceChange', async function() {
                 const abortController = new AbortController();
                 try {
-                    const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+                    const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
                     const priceTicker = await orderbook.getPriceTicker() as PriceTickerInternal;
                     const events = new Array<PriceChangedEvent>();
                     priceTicker.addEventListener(PriceTickerEventType.PRICE_CHANGED, event => events.push(event), { signal: abortController.signal });

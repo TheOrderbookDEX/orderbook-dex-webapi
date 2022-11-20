@@ -5,8 +5,8 @@ export {
 export { Chain, ChainConnectionFailed, ChainNotConnected } from './Chain';
 export {
     OrderbookDEX, ChainNotSupported, OrderbookDEXNotConnected,
-    OrderbookDEXEventType, OrderbookDEXEvent, OrderbookAddedEvent,
-    OrderbookFilter
+    OrderbookDEXEventType, OrderbookDEXEvent, OrderbookFilter,
+    TokenAddedEvent, TokenRemovedEvent,
 } from './OrderbookDEX';
 export { Address, ZERO_ADDRESS, isAddress } from './Address';
 export {
@@ -25,10 +25,6 @@ export {
 } from './PriceHistory';
 export { Token, NotAnERC20Token } from './Token';
 export { Order, OrderType, OrderStatus, OrderExecutionType } from './Order';
-export {
-    UserData, UserDataNotLoaded, TokenAddedEvent, TokenRemovedEvent,
-    UserDataEvent, UserDataEventType
-} from './UserData';
 export { APIEvents, APIEventType, APIEvent, WalletConnectedEvent } from './APIEvents';
 export {
     Operator, PermissionToWalletRequired, RequestRejected, OperatorNotConnected,

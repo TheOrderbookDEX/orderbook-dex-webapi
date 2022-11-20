@@ -1,11 +1,11 @@
 import { Transaction } from '@frugal-wizard/abi2ts-lib';
 import { expect, use } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
-import { Chain, Order, Orderbook, OrderbookDEX, Token, UserData, Operator, OperatorEventType } from '../src';
+import { Chain, Order, OrderbookDEX, Operator, OperatorEventType } from '../src';
 import { Database } from '../src/Database';
 import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-provider';
 import { resetIndexedDB } from './indexeddb';
-import { setUpSmartContracts } from './smart-contracts';
+import { setUpSmartContracts, testContracts } from './smart-contracts';
 import { increaseTime, setUpTimeMock, tearDownTimeMock } from './time-mock';
 import { asyncFirst, asyncToArray } from './utils';
 
@@ -17,12 +17,10 @@ describe('Operator', function() {
         await Chain.connect();
         await setUpSmartContracts();
         await OrderbookDEX.connect();
-        await UserData.load();
     });
 
     afterEach(async function() {
         Operator.disconnect();
-        UserData.unload();
         OrderbookDEX.disconnect();
         Chain.disconnect();
         await tearDownEthereumProvider();
@@ -55,19 +53,19 @@ describe('Operator', function() {
 
         describe('deposit', function() {
             it('should work', async function() {
-                const token = await asyncFirst(UserData.instance.trackedTokens()) as Token;
+                const token = await OrderbookDEX.instance.getToken(Object.values(testContracts.tokens)[0]);
                 await Operator.instance.deposit(token, 1n);
             });
         });
 
         describe('withdraw', function() {
             beforeEach(async function() {
-                const token = await asyncFirst(UserData.instance.trackedTokens()) as Token;
+                const token = await OrderbookDEX.instance.getToken(Object.values(testContracts.tokens)[0]);
                 await Operator.instance.deposit(token, 1n);
             });
 
             it('should work', async function() {
-                const token = await asyncFirst(UserData.instance.trackedTokens()) as Token;
+                const token = await OrderbookDEX.instance.getToken(Object.values(testContracts.tokens)[0]);
                 await Operator.instance.withdraw(token, 1n);
             });
         });
@@ -76,7 +74,7 @@ describe('Operator', function() {
     describe('trade operations', function() {
         beforeEach(async function() {
             await Operator.create();
-            const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+            const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
             await Operator.instance.deposit(orderbook.tradedToken, orderbook.contractSize);
             await Operator.instance.deposit(orderbook.baseToken, orderbook.priceTick);
         });
@@ -85,28 +83,28 @@ describe('Operator', function() {
 
         describe('buyAtMarket', function() {
             it('should work', async function() {
-                const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+                const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
                 await Operator.instance.buyAtMarket(orderbook, 1n, orderbook.priceTick);
             });
         });
 
         describe('sellAtMarket', function() {
             it('should work', async function() {
-                const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+                const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
                 await Operator.instance.sellAtMarket(orderbook, 1n, orderbook.priceTick);
             });
         });
 
         describe('placeBuyOrder', function() {
             it('should work', async function() {
-                const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+                const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
                 await Operator.instance.placeBuyOrder(orderbook, 1n, orderbook.priceTick);
             });
         });
 
         describe('placeSellOrder', function() {
             it('should work', async function() {
-                const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+                const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
                 await Operator.instance.placeSellOrder(orderbook, 1n, orderbook.priceTick);
             });
         });
@@ -126,7 +124,7 @@ describe('Operator', function() {
 
         describe('dismissOrder', function() {
             beforeEach(async function() {
-                const orderbook = await asyncFirst(UserData.instance.savedOrderbooks()) as Orderbook;
+                const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
                 await Operator.instance.deposit(orderbook.tradedToken, orderbook.contractSize);
                 await Operator.instance.deposit(orderbook.baseToken, orderbook.priceTick);
                 await Operator.instance.placeSellOrder(orderbook, 1n, orderbook.priceTick);

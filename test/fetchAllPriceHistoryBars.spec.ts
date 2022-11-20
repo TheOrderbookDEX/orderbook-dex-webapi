@@ -1,7 +1,6 @@
 import { use, expect } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import addContext from 'mochawesome/addContext';
-import { fetchOrderbook } from '../src/Orderbook';
 import { Chain, ChainInternal } from '../src/Chain';
 import { fetchAllPriceHistoryBars } from '../src/PriceHistory';
 import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-provider';
@@ -50,7 +49,7 @@ describe('fetchAllPriceHistoryBars', function() {
             });
 
             it('should return expected bars', async function() {
-                const orderbook = await fetchOrderbook(testOrderbook);
+                const orderbook = await OrderbookDEX.instance.getOrderbook(testOrderbook);
                 const prev_MAX_GET_LOGS_BLOCKS = ChainInternal.instance.MAX_GET_LOGS_BLOCKS;
                 if (scenario.MAX_GET_LOGS_BLOCKS) {
                     ChainInternal.instance.MAX_GET_LOGS_BLOCKS = scenario.MAX_GET_LOGS_BLOCKS;

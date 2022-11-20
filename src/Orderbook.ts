@@ -1,9 +1,9 @@
 import { IOrderbookFactoryV1, OrderbookCreated } from '@theorderbookdex/orderbook-dex-v1/dist/interfaces/IOrderbookFactoryV1';
 import { IOrderbook } from '@theorderbookdex/orderbook-dex/dist/interfaces/IOrderbook';
 import { Address, ZERO_ADDRESS } from './Address';
-import { Database, OrderbookData } from './Database';
+import { Database, OrderbookData, TrackedFlag } from './Database';
 import { OrderbookDEXInternal } from './OrderbookDEX';
-import { fetchToken, Token } from './Token';
+import { Token } from './Token';
 import { asyncCatchError, asyncFirst, checkAbortSignal } from './utils';
 import { PriceHistory, PriceHistoryInternal, TimeFrame } from './PriceHistory';
 import { PricePoints, PricePointsInternal } from './PricePoints';
@@ -49,6 +49,11 @@ export abstract class Orderbook {
      * The price tick in base token.
      */
     abstract get priceTick(): bigint;
+
+    /**
+     * The block number the orderbook was created at.
+     */
+    abstract get creationBlockNumber(): number;
 
     /**
      * Get the price points.
@@ -150,7 +155,7 @@ export async function* fetchOrderbooksData(abortSignal?: AbortSignal) {
     }
 }
 
-export async function fetchOrderbookData(address: Address, abortSignal?: AbortSignal) {
+export async function fetchOrderbookData(address: Address, abortSignal?: AbortSignal): Promise<OrderbookData> {
     checkAbortSignal(abortSignal);
     try {
         return await Database.instance.getOrderbook(address, abortSignal);
@@ -166,7 +171,16 @@ export async function fetchOrderbookData(address: Address, abortSignal?: AbortSi
                 checkAbortSignal(abortSignal);
                 if (!event) throw new NotAnOrderbook();
                 const { tradedToken, baseToken, contractSize, priceTick, blockNumber: creationBlockNumber } = event;
-                const orderbook = { address, version, tradedToken, baseToken, contractSize, priceTick, creationBlockNumber } as OrderbookData;
+                const orderbook = {
+                    tracked: TrackedFlag.NOT_TRACKED,
+                    address,
+                    version,
+                    tradedToken: tradedToken as Address,
+                    baseToken: baseToken as Address,
+                    contractSize,
+                    priceTick,
+                    creationBlockNumber,
+                };
                 await Database.instance.saveOrderbook(orderbook, abortSignal);
                 return orderbook;
             }
@@ -175,15 +189,6 @@ export async function fetchOrderbookData(address: Address, abortSignal?: AbortSi
             }
         }
     }
-}
-
-export async function fetchOrderbook(address: Address, abortSignal?: AbortSignal): Promise<Orderbook> {
-    const orderbookData = await fetchOrderbookData(address, abortSignal);
-    return new OrderbookInternal({
-        ...orderbookData,
-        tradedToken: await fetchToken(orderbookData.tradedToken, abortSignal),
-        baseToken: await fetchToken(orderbookData.baseToken, abortSignal),
-    });
 }
 
 /**

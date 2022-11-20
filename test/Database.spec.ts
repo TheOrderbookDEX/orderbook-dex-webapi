@@ -3,7 +3,7 @@ import { use, expect } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import addContext from 'mochawesome/addContext';
 import { Address } from '../src/Address';
-import { Database } from '../src/Database';
+import { Database, TrackedFlag } from '../src/Database';
 import { orderbookDEXChainConfigs } from '../src/OrderbookDEX';
 import { resetIndexedDB } from './indexeddb';
 import { addPriceHistoryRangeScenarios } from './scenarios/addPriceHistoryRange';
@@ -44,6 +44,7 @@ describe('Database', function() {
             beforeEach(async function() {
                 for (let n = 1; n <= Database.GET_ORDERBOOKS_BATCH + 1; n++) {
                     await Database.instance.saveOrderbook({
+                        tracked: TrackedFlag.NOT_TRACKED,
                         address: hexstring(0x1000000000000000000000000000000000000000n + BigInt(n)) as Address,
                         version: 10000n,
                         tradedToken: hexstring(0x2000000000000000000000000000000000000000n + BigInt(n)) as Address,

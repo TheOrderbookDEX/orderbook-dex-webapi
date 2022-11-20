@@ -1,11 +1,11 @@
 import { Address, ZERO_ADDRESS } from './Address';
 import { APIEvents, WalletConnectedEvent } from './APIEvents';
 import { ChainInternal } from './Chain';
-import { OrderbookDEXInternal } from './OrderbookDEX';
+import { OrderbookDEX, OrderbookDEXInternal } from './OrderbookDEX';
 import { IOperatorFactory } from '@theorderbookdex/orderbook-dex-operator/dist/interfaces/IOperatorFactory';
 import { getDevChainFunds } from './dev-chain';
 import { isUserRejectionError } from './ethereum';
-import { fetchOrderbook, Orderbook } from './Orderbook';
+import { Orderbook } from './Orderbook';
 import { checkAbortSignal, createSubAbortController, max, min } from './utils';
 import { ContractEvent, decodeErrorData, MAX_UINT32, Transaction } from '@frugal-wizard/abi2ts-lib';
 import { IERC20 } from '@theorderbookdex/orderbook-dex/dist/interfaces/IERC20';
@@ -623,7 +623,7 @@ export class OperatorInternal extends Operator {
         for (const order of await Database.instance.getOrders(this.operatorAddress, abortSignal)) {
             yield {
                 ...order,
-                orderbook: await fetchOrderbook(order.orderbook, abortSignal),
+                orderbook: await OrderbookDEX.instance.getOrderbook(order.orderbook, abortSignal),
             };
         }
     }
@@ -632,7 +632,7 @@ export class OperatorInternal extends Operator {
         for (const order of await Database.instance.getRecentOrders(this.operatorAddress, count, abortSignal)) {
             yield {
                 ...order,
-                orderbook: await fetchOrderbook(order.orderbook, abortSignal),
+                orderbook: await OrderbookDEX.instance.getOrderbook(order.orderbook, abortSignal),
             };
         }
     }
@@ -641,7 +641,7 @@ export class OperatorInternal extends Operator {
         for (const order of await Database.instance.getOpenOrders(this.operatorAddress, abortSignal)) {
             yield {
                 ...order,
-                orderbook: await fetchOrderbook(order.orderbook, abortSignal),
+                orderbook: await OrderbookDEX.instance.getOrderbook(order.orderbook, abortSignal),
             };
         }
     }
@@ -650,7 +650,7 @@ export class OperatorInternal extends Operator {
         for (const order of await Database.instance.getClosedOrders(this.operatorAddress, abortSignal)) {
             yield {
                 ...order,
-                orderbook: await fetchOrderbook(order.orderbook, abortSignal),
+                orderbook: await OrderbookDEX.instance.getOrderbook(order.orderbook, abortSignal),
             };
         }
     }
@@ -692,7 +692,7 @@ export class OperatorInternal extends Operator {
         const refreshedOrder = await Database.instance.getOrder(order.key, abortSignal);
         return {
             ...refreshedOrder,
-            orderbook: await fetchOrderbook(refreshedOrder.orderbook),
+            orderbook: await OrderbookDEX.instance.getOrderbook(refreshedOrder.orderbook),
         };
     }
 

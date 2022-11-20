@@ -2,6 +2,14 @@ export function checkAbortSignal(abortSignal?: AbortSignal) {
     if (abortSignal?.aborted) throw abortSignal.reason;
 }
 
+export function createAbortifier(abortSignal?: AbortSignal): <T>(promise: Promise<T>) => Promise<T> {
+    return async <T>(promise: Promise<T>) => {
+        const result = await promise;
+        checkAbortSignal(abortSignal);
+        return result;
+    };
+}
+
 export function isAbortReason(abortSignal: AbortSignal | undefined, error: unknown) {
     return abortSignal?.aborted && abortSignal.reason === error;
 }
