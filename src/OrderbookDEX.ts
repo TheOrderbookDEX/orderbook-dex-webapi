@@ -237,8 +237,14 @@ export class OrderbookDEXInternal extends OrderbookDEX {
         this.dispatchEvent(new TokenAddedEvent(token));
     }
 
-    async * getOrderbooks(filter: OrderbookFilter, abortSignal?: AbortSignal): AsyncIterable<Orderbook> {
-        // TODO init orderbooks
+    async * getOrderbooks(filter: OrderbookFilter, abortSignal?: AbortSignal): AsyncIterable<OrderbookInternal> {
+        if (!await Database.instance.getSetting('orderbooksInitialized', abortSignal)) {
+            for (const address of this._config.orderbooks) {
+                const orderbook = await this.getOrderbook(address, abortSignal);
+                await this.trackOrderbook(orderbook, abortSignal);
+            }
+            await Database.instance.setSetting('orderbooksInitialized', true, abortSignal);
+        }
         // TODO filter tracked orderbooks
         // TODO filter out orderbooks with tokens not matching tracked tokens
         for await (const orderbook of fetchOrderbooksData(abortSignal)) {
@@ -252,7 +258,7 @@ export class OrderbookDEXInternal extends OrderbookDEX {
         }
     }
 
-    async getOrderbook(address: Address, abortSignal?: AbortSignal): Promise<Orderbook> {
+    async getOrderbook(address: Address, abortSignal?: AbortSignal): Promise<OrderbookInternal> {
         const orderbook = await fetchOrderbookData(address, abortSignal);
         return new OrderbookInternal({
             ...orderbook,
