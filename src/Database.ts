@@ -12,6 +12,9 @@ export class Database {
             const db = await openDB<DatabaseSchemaV1>(`Database${chainId}`, version, {
                 async upgrade(db, oldVersion, newVersion: number) {
                     if (newVersion >= 1) {
+                        db.createObjectStore('settings', {
+                            keyPath: 'name',
+                        });
                         db.createObjectStore('blocks', {
                             keyPath: 'blockNumber',
                         });
@@ -56,6 +59,16 @@ export class Database {
     }
 
     constructor(private readonly _db: IDBPDatabase<DatabaseSchemaV1>) {}
+
+    async getSetting<T extends keyof Settings>(name: T, abortSignal?: AbortSignal): Promise<Settings[T] | undefined> {
+        const abortify = createAbortifier(abortSignal);
+        return (await abortify(this._db.get('settings', name)))?.value as Settings[T];
+    }
+
+    async setSetting<T extends keyof Settings>(name: T, value: Settings[T], abortSignal?: AbortSignal): Promise<void> {
+        const abortify = createAbortifier(abortSignal);
+        await abortify(this._db.put('settings', { name, value }));
+    }
 
     async getBlockTimestamp(blockNumber: number, abortSignal?: AbortSignal) {
         const abortify = createAbortifier(abortSignal);
@@ -303,6 +316,11 @@ export class NotInDatabase extends Error {
     }
 }
 
+export interface Settings {
+    tokensInitialized: boolean;
+    orderbooksInitialized: boolean;
+}
+
 export interface BlockData {
     blockNumber: number;
     timestamp: number;
@@ -377,6 +395,13 @@ export interface OrderData {
 }
 
 interface DatabaseSchemaV1 extends DBSchema {
+    settings: {
+        key: string;
+        value: {
+            name: string;
+            value: unknown;
+        };
+    },
     blocks: {
         key: BlockData['blockNumber'];
         value: BlockData;

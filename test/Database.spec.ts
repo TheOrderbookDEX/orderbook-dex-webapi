@@ -4,14 +4,14 @@ import chaiAsPromised from 'chai-as-promised';
 import addContext from 'mochawesome/addContext';
 import { Address } from '../src/Address';
 import { Database, TrackedFlag } from '../src/Database';
-import { orderbookDEXChainConfigs } from '../src/OrderbookDEX';
+import { orderbookDEXConfigs } from '../src/OrderbookDEX';
 import { resetIndexedDB } from './indexeddb';
 import { addPriceHistoryRangeScenarios } from './scenarios/addPriceHistoryRange';
 import { getPriceHistoryRangesScenarios } from './scenarios/getPriceHistoryRanges';
 
 use(chaiAsPromised);
 
-const testOrderbook = orderbookDEXChainConfigs[1337]?.orderbooks[0] as Address;
+const testOrderbook = orderbookDEXConfigs[1337]?.orderbooks[0] as Address;
 
 describe('Database', function() {
     afterEach(async function() {

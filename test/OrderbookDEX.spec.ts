@@ -4,6 +4,7 @@ import { use, expect } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import { Orderbook, OrderbookDEX, OrderbookDEXNotConnected } from '../src';
 import { Chain, ChainNotConnected } from '../src/Chain';
+import { devnetConfig } from '../src/OrderbookDEX';
 import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-provider';
 import { resetIndexedDB } from './indexeddb';
 import { setUpSmartContracts, testContracts } from './smart-contracts';
@@ -129,20 +130,13 @@ describe('OrderbookDEX', function() {
         });
 
         describe('getTokens', function() {
-            beforeEach(async function() {
-                for (const address of Object.values(testContracts.tokens)) {
-                    const token = await OrderbookDEX.instance.getToken(address);
-                    await OrderbookDEX.instance.trackToken(token);
-                }
-            });
-
             it('should return tracked tokens', async function() {
                 const tokens = [];
                 for await (const { address, name, symbol, decimals } of OrderbookDEX.instance.getTokens()) {
                     tokens.push({ address, name, symbol, decimals });
                 }
                 expect(tokens.map(({ address }) => address))
-                    .to.have.members(Object.values(testContracts.tokens));
+                    .to.have.members(devnetConfig.tokens);
                 for (const token of tokens) {
                     const contract = IERC20.at(token.address);
                     expect(token.name)

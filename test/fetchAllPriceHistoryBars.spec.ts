@@ -6,7 +6,7 @@ import { fetchAllPriceHistoryBars } from '../src/PriceHistory';
 import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-provider';
 import { resetIndexedDB } from './indexeddb';
 import { setUpSmartContracts, simulatePriceHistory } from './smart-contracts';
-import { OrderbookDEX, orderbookDEXChainConfigs } from '../src/OrderbookDEX';
+import { OrderbookDEX, orderbookDEXConfigs } from '../src/OrderbookDEX';
 import { TimeFrame, PriceHistoryBar } from '../src/PriceHistory';
 import { deepConvertBigIntToString } from './utils';
 import { fetchAllPriceHistoryBarsScenarios } from './scenarios/fetchAllPriceHistoryBars';
@@ -14,7 +14,7 @@ import { Address } from '../src/Address';
 
 use(chaiAsPromised);
 
-const testOrderbook = orderbookDEXChainConfigs[1337]?.orderbooks[0] as Address;
+const testOrderbook = orderbookDEXConfigs[1337]?.orderbooks[0] as Address;
 const testTimeFrame = TimeFrame.MINUTES_15 as number;
 
 describe('fetchAllPriceHistoryBars', function() {

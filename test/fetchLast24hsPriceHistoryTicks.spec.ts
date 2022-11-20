@@ -6,14 +6,14 @@ import { fetchLast24hsPriceHistoryTicks, PriceHistoryTickInternal } from '../src
 import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-provider';
 import { resetIndexedDB } from './indexeddb';
 import { setUpSmartContracts, simulateTicks } from './smart-contracts';
-import { OrderbookDEX, orderbookDEXChainConfigs } from '../src/OrderbookDEX';
+import { OrderbookDEX, orderbookDEXConfigs } from '../src/OrderbookDEX';
 import { fetchLast24hsPriceHistoryTicksScenarios } from './scenarios/fetchLast24hsPriceHistoryTicks';
 import { getBlockNumber } from '@frugal-wizard/abi2ts-lib';
 import { Address } from '../src/Address';
 
 use(chaiAsPromised);
 
-const testOrderbook = orderbookDEXChainConfigs[1337]?.orderbooks[0] as Address;
+const testOrderbook = orderbookDEXConfigs[1337]?.orderbooks[0] as Address;
 
 describe('fetchLast24hsPriceHistoryTicks', function() {
     beforeEach(async function() {

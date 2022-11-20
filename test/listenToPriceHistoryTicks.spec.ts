@@ -6,7 +6,7 @@ import { fetchPriceHistoryTicks, listenToPriceHistoryTicks, PriceHistoryTickInte
 import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-provider';
 import { resetIndexedDB } from './indexeddb';
 import { setUpSmartContracts, simulateTicks } from './smart-contracts';
-import { OrderbookDEX, orderbookDEXChainConfigs } from '../src/OrderbookDEX';
+import { OrderbookDEX, orderbookDEXConfigs } from '../src/OrderbookDEX';
 import { Database } from '../src/Database';
 import { listenToPriceHistoryTicksScenarios } from './scenarios/listenToPriceHistoryTicks';
 import { ChainEvents } from '../src/ChainEvents';
@@ -15,7 +15,7 @@ import { Address } from '../src/Address';
 
 use(chaiAsPromised);
 
-const testOrderbook = orderbookDEXChainConfigs[1337]?.orderbooks[0] as Address;
+const testOrderbook = orderbookDEXConfigs[1337]?.orderbooks[0] as Address;
 
 describe('listenToPriceHistoryTicks', function() {
     beforeEach(async function() {

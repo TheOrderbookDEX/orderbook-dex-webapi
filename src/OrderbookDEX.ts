@@ -5,7 +5,7 @@ import { Database, NotInDatabase, TrackedFlag } from './Database';
 import { GenericEventListener } from './event-types';
 import { fetchOrderbookData, fetchOrderbooksData, Orderbook, OrderbookInternal } from './Orderbook';
 import { NotAnERC20Token, Token } from './Token';
-import { asyncCatchError, checkAbortSignal, createAbortifier } from './utils';
+import { asyncCatchError, createAbortifier } from './utils';
 
 export enum OrderbookDEXEventType {
     /**
@@ -169,7 +169,7 @@ export class OrderbookDEXInternal extends OrderbookDEX {
 
     static async connect(): Promise<OrderbookDEXInternal> {
         if (!this._instance) {
-            const config = orderbookDEXChainConfigs[Chain.instance.chainId];
+            const config = orderbookDEXConfigs[Chain.instance.chainId];
             if (!config) {
                 throw new ChainNotSupported();
             }
@@ -189,7 +189,7 @@ export class OrderbookDEXInternal extends OrderbookDEX {
         delete this._instance;
     }
 
-    constructor(public readonly _config: OrderbookDEXChainConfig) {
+    constructor(public readonly _config: OrderbookDEXConfig) {
         super();
     }
 
@@ -215,22 +215,26 @@ export class OrderbookDEXInternal extends OrderbookDEX {
     }
 
     async * getTokens(abortSignal?: AbortSignal): AsyncIterable<Token> {
-        // TODO init tokens
+        if (!await Database.instance.getSetting('tokensInitialized', abortSignal)) {
+            for (const address of this._config.tokens) {
+                const token = await this.getToken(address, abortSignal);
+                await this.trackToken(token, abortSignal);
+            }
+            await Database.instance.setSetting('tokensInitialized', true, abortSignal);
+        }
         for await (const token of Database.instance.getTrackedTokens(abortSignal)) {
             yield new Token({ ...token, tracked: token.tracked == TrackedFlag.TRACKED });
         }
     }
 
     async trackToken(token: Token, abortSignal?: AbortSignal): Promise<void> {
-        await Database.instance.saveToken({ ...token, tracked: TrackedFlag.TRACKED });
+        await Database.instance.saveToken({ ...token, tracked: TrackedFlag.TRACKED }, abortSignal);
         this.dispatchEvent(new TokenAddedEvent(token));
-        checkAbortSignal(abortSignal);
     }
 
     async forgetToken(token: Token, abortSignal?: AbortSignal): Promise<void> {
-        await Database.instance.saveToken({ ...token, tracked: TrackedFlag.NOT_TRACKED });
+        await Database.instance.saveToken({ ...token, tracked: TrackedFlag.NOT_TRACKED }, abortSignal);
         this.dispatchEvent(new TokenAddedEvent(token));
-        checkAbortSignal(abortSignal);
     }
 
     async * getOrderbooks(filter: OrderbookFilter, abortSignal?: AbortSignal): AsyncIterable<Orderbook> {
@@ -263,8 +267,7 @@ export class OrderbookDEXInternal extends OrderbookDEX {
             tradedToken: orderbook.tradedToken.address,
             baseToken: orderbook.baseToken.address,
             tracked: TrackedFlag.TRACKED,
-        });
-        checkAbortSignal(abortSignal);
+        }, abortSignal);
     }
 
     async forgetOrderbook(orderbook: OrderbookInternal, abortSignal?: AbortSignal): Promise<void> {
@@ -273,8 +276,7 @@ export class OrderbookDEXInternal extends OrderbookDEX {
             tradedToken: orderbook.tradedToken.address,
             baseToken: orderbook.baseToken.address,
             tracked: TrackedFlag.NOT_TRACKED,
-        });
-        checkAbortSignal(abortSignal);
+        }, abortSignal);
     }
 }
 
@@ -330,7 +332,7 @@ export class ChainNotSupported extends Error {
     }
 }
 
-interface OrderbookDEXChainConfig {
+interface OrderbookDEXConfig {
     readonly operatorFactory: Address;
     readonly operatorV1: Address;
     readonly orderbookFactoryV1: Address;
@@ -338,9 +340,9 @@ interface OrderbookDEXChainConfig {
     readonly orderbooks: Address[];
 }
 
-export const orderbookDEXChainConfigs: { [chainId: number]: OrderbookDEXChainConfig | undefined } = {};
+export const orderbookDEXConfigs: { [chainId: number]: OrderbookDEXConfig | undefined } = {};
 
-orderbookDEXChainConfigs[5] = {
+orderbookDEXConfigs[5] = {
     operatorFactory: '0x7BF5889661f06B7d287C6acBA754d318F17E4A52' as Address,
     operatorV1: '0x0000000000000000000000000000000000000000' as Address,
     orderbookFactoryV1: '0xdFbd8e2360B96C0bd4A00d4D1271A33f0C6E75C7' as Address,
@@ -355,7 +357,7 @@ orderbookDEXChainConfigs[5] = {
     ],
 };
 
-orderbookDEXChainConfigs[1337] = {
+export const devnetConfig = orderbookDEXConfigs[1337] = {
     operatorFactory: '0x2946259E0334f33A064106302415aD3391BeD384' as Address,
     operatorV1: '0xDe09E74d4888Bc4e65F589e8c13Bce9F71DdF4c7' as Address,
     orderbookFactoryV1: '0x51a240271AB8AB9f9a21C82d9a85396b704E164d' as Address,

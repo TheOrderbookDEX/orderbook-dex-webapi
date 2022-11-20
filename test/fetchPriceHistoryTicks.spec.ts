@@ -6,7 +6,7 @@ import { captureFilledEventFetched, fetchPriceHistoryTicks } from '../src/PriceH
 import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-provider';
 import { resetIndexedDB } from './indexeddb';
 import { setUpSmartContracts, simulateTicks } from './smart-contracts';
-import { OrderbookDEX, orderbookDEXChainConfigs } from '../src/OrderbookDEX';
+import { OrderbookDEX, orderbookDEXConfigs } from '../src/OrderbookDEX';
 import { Database } from '../src/Database';
 import { fetchPriceHistoryTicksScenarios } from './scenarios/fetchPriceHistoryTicks';
 import { getBlockNumber } from '@frugal-wizard/abi2ts-lib';
@@ -14,7 +14,7 @@ import { Address } from '../src/Address';
 
 use(chaiAsPromised);
 
-const testOrderbook = orderbookDEXChainConfigs[1337]?.orderbooks[0] as Address;
+const testOrderbook = orderbookDEXConfigs[1337]?.orderbooks[0] as Address;
 
 describe('fetchPriceHistoryTicks', function() {
     beforeEach(async function() {
