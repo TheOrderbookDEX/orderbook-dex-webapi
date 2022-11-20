@@ -245,9 +245,9 @@ export class OrderbookDEXInternal extends OrderbookDEX {
             }
             await Database.instance.setSetting('orderbooksInitialized', true, abortSignal);
         }
-        // TODO filter tracked orderbooks
         // TODO filter out orderbooks with tokens not matching tracked tokens
         for await (const orderbook of fetchOrderbooksData(abortSignal)) {
+            if (filter.tracked && orderbook.tracked != TrackedFlag.TRACKED) continue;
             if (filter.tradedToken && filter.tradedToken != orderbook.tradedToken) continue;
             if (filter.baseToken && filter.baseToken != orderbook.baseToken) continue;
             yield new OrderbookInternal({
