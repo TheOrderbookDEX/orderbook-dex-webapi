@@ -81,7 +81,7 @@ export abstract class Operator extends EventTarget {
      * @throws {OperatorAlreadyCreated} When the operator has been created already.
      */
     static async create(): Promise<Operator> {
-        return await OperatorInternal.register();
+        return await OperatorInternal.create();
     }
 
     /**
@@ -314,7 +314,7 @@ export class OperatorInternal extends Operator {
         return this._instance;
     }
 
-    static async register(): Promise<OperatorInternal> {
+    static async create(): Promise<OperatorInternal> {
         if (this._instance) {
             throw new OperatorAlreadyCreated();
         }
