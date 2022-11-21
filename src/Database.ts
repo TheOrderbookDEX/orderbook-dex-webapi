@@ -317,8 +317,7 @@ export class NotInDatabase extends Error {
 }
 
 export interface Settings {
-    tokensInitialized: boolean;
-    orderbooksInitialized: boolean;
+    initialized: boolean;
 }
 
 export interface BlockData {

@@ -36,6 +36,7 @@ describe('OrderbookDEX', function() {
             describe('after connecting chain', function() {
                 beforeEach(async function() {
                     await Chain.connect();
+                    await setUpSmartContracts();
                 });
 
                 afterEach(function() {
@@ -53,6 +54,7 @@ describe('OrderbookDEX', function() {
         describe('instance', function() {
             beforeEach(async function() {
                 await Chain.connect();
+                await setUpSmartContracts();
             });
 
             afterEach(function() {

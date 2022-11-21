@@ -174,6 +174,7 @@ export class OrderbookDEXInternal extends OrderbookDEX {
                 throw new ChainNotSupported();
             }
             this._instance = new OrderbookDEXInternal(config);
+            await this._instance.initialize();
         }
         return this._instance;
     }
@@ -191,6 +192,20 @@ export class OrderbookDEXInternal extends OrderbookDEX {
 
     constructor(public readonly _config: OrderbookDEXConfig) {
         super();
+    }
+
+    async initialize(abortSignal?: AbortSignal): Promise<void> {
+        if (!await Database.instance.getSetting('initialized', abortSignal)) {
+            for (const address of this._config.tokens) {
+                const token = await this.getToken(address, abortSignal);
+                await this.trackToken(token, abortSignal);
+            }
+            for (const address of this._config.orderbooks) {
+                const orderbook = await this.getOrderbook(address, abortSignal);
+                await this.trackOrderbook(orderbook, abortSignal);
+            }
+            await Database.instance.setSetting('initialized', true, abortSignal);
+        }
     }
 
     async getToken(address: Address, abortSignal?: AbortSignal): Promise<Token> {
@@ -215,13 +230,6 @@ export class OrderbookDEXInternal extends OrderbookDEX {
     }
 
     async * getTokens(abortSignal?: AbortSignal): AsyncIterable<Token> {
-        if (!await Database.instance.getSetting('tokensInitialized', abortSignal)) {
-            for (const address of this._config.tokens) {
-                const token = await this.getToken(address, abortSignal);
-                await this.trackToken(token, abortSignal);
-            }
-            await Database.instance.setSetting('tokensInitialized', true, abortSignal);
-        }
         for await (const token of Database.instance.getTrackedTokens(abortSignal)) {
             yield new Token({ ...token, tracked: token.tracked == TrackedFlag.TRACKED });
         }
@@ -238,23 +246,15 @@ export class OrderbookDEXInternal extends OrderbookDEX {
     }
 
     async * getOrderbooks(filter: OrderbookFilter, abortSignal?: AbortSignal): AsyncIterable<OrderbookInternal> {
-        if (!await Database.instance.getSetting('orderbooksInitialized', abortSignal)) {
-            for (const address of this._config.orderbooks) {
-                const orderbook = await this.getOrderbook(address, abortSignal);
-                await this.trackOrderbook(orderbook, abortSignal);
-            }
-            await Database.instance.setSetting('orderbooksInitialized', true, abortSignal);
-        }
-        // TODO filter out orderbooks with tokens not matching tracked tokens
         for await (const orderbook of fetchOrderbooksData(abortSignal)) {
             if (filter.tracked && orderbook.tracked != TrackedFlag.TRACKED) continue;
             if (filter.tradedToken && filter.tradedToken != orderbook.tradedToken) continue;
             if (filter.baseToken && filter.baseToken != orderbook.baseToken) continue;
-            yield new OrderbookInternal({
-                ...orderbook,
-                tradedToken: await this.getToken(orderbook.tradedToken, abortSignal),
-                baseToken: await this.getToken(orderbook.baseToken, abortSignal),
-            });
+            const tradedToken = await this.getToken(orderbook.tradedToken, abortSignal);
+            if (!tradedToken.tracked) continue;
+            const baseToken = await this.getToken(orderbook.baseToken, abortSignal);
+            if (!tradedToken.tracked) continue;
+            yield new OrderbookInternal({ ...orderbook, tradedToken, baseToken });
         }
     }
 
