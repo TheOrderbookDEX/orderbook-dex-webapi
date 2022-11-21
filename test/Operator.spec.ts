@@ -5,7 +5,7 @@ import { Chain, Order, OrderbookDEX, Operator, OperatorEventType } from '../src'
 import { Database } from '../src/Database';
 import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-provider';
 import { resetIndexedDB } from './indexeddb';
-import { setUpSmartContracts, testContracts } from './smart-contracts';
+import { giveMeFunds, setUpSmartContracts, testContracts } from './smart-contracts';
 import { increaseTime, setUpTimeMock, tearDownTimeMock } from './time-mock';
 import { asyncFirst, asyncToArray } from './utils';
 
@@ -44,9 +44,10 @@ describe('Operator', function() {
         });
     });
 
-    describe('operator operations', function() {
+    describe('wallet operations', function() {
         beforeEach(async function() {
             await Operator.create();
+            await giveMeFunds();
         });
 
         // TODO thoroughly test wallet operations
@@ -74,6 +75,7 @@ describe('Operator', function() {
     describe('trade operations', function() {
         beforeEach(async function() {
             await Operator.create();
+            await giveMeFunds();
             const orderbook = await OrderbookDEX.instance.getOrderbook(Object.values(testContracts.orderbooks)[0].address);
             await Operator.instance.deposit(orderbook.tradedToken, orderbook.contractSize);
             await Operator.instance.deposit(orderbook.baseToken, orderbook.priceTick);
@@ -113,6 +115,7 @@ describe('Operator', function() {
     describe('order operations', function() {
         beforeEach(async function() {
             await Operator.create();
+            await giveMeFunds();
             setUpTimeMock();
         });
 

@@ -31,6 +31,11 @@ export class Token {
     readonly decimals: number;
 
     /**
+     * Whether the token has a faucet function.
+     */
+    readonly hasFaucet: boolean;
+
+    /**
      * The value of one integer unit of the token.
      */
     get unit(): bigint {
@@ -63,12 +68,14 @@ export class Token {
         name,
         symbol,
         decimals,
+        hasFaucet,
     }: TokenProperties) {
         this.tracked = tracked;
         this.address = address;
         this.name = name;
         this.symbol = symbol;
         this.decimals = decimals;
+        this.hasFaucet = hasFaucet;
     }
 }
 
@@ -78,6 +85,7 @@ interface TokenProperties {
     readonly name: string;
     readonly symbol: string;
     readonly decimals: number;
+    readonly hasFaucet: boolean;
 }
 
 /**

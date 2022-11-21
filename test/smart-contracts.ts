@@ -1,13 +1,13 @@
 import { AddressBook } from '@frugal-wizard/addressbook/dist/AddressBook';
-import { ERC20Mock } from '@theorderbookdex/orderbook-dex/dist/testing/ERC20Mock';
 import { OperatorFactory } from '@theorderbookdex/orderbook-dex-operator/dist/OperatorFactory';
 import { OrderbookFactoryV1 } from '@theorderbookdex/orderbook-dex-v1/dist/OrderbookFactoryV1';
 import { IOrderbookV1 } from '@theorderbookdex/orderbook-dex-v1/dist/interfaces/IOrderbookV1';
 import { IERC20 } from '@theorderbookdex/orderbook-dex/dist/interfaces/IERC20';
-import { createSigner, getAccounts, getBalance, getBlockNumber, getBlockTimestamp, hexstring, Signer } from '@frugal-wizard/abi2ts-lib';
+import { createSigner, getBalance, getBlockNumber, getBlockTimestamp, hexstring, Signer } from '@frugal-wizard/abi2ts-lib';
 import { EthereumProvider } from 'ganache';
 import { OperatorV1 } from '@theorderbookdex/orderbook-dex-v1-operator/dist/OperatorV1';
 import { Address, ZERO_ADDRESS } from '../src';
+import { ERC20WithFaucet } from '@theorderbookdex/orderbook-dex/dist/testing/ERC20WithFaucet';
 
 interface Global {
     ethereum?: EthereumProvider;
@@ -49,6 +49,8 @@ export const testContracts: TestContracts = {
     },
 }
 
+const ONE_DAY = 24n * 60n * 60n;
+
 export async function setUpSmartContracts() {
     const signer = await createSigner('0x0000000000000000000000000000000000000000000000000000000000000001');
     await global.ethereum?.send('evm_setAccountBalance', [ signer.address, hexstring(1000000000000000000000n) ]);
@@ -58,11 +60,11 @@ export async function setUpSmartContracts() {
     testContracts.operatorV1       = (await signer.sendTransaction(await OperatorV1.populateTransaction.deploy())).contractAddress as Address;
     testContracts.orderbookFactory = (await signer.sendTransaction(await OrderbookFactoryV1.populateTransaction.deploy(testContracts.addressBook))).contractAddress as Address;
 
-    testContracts.tokens.WBTC = (await signer.sendTransaction(await ERC20Mock.populateTransaction.deploy('Wrapped BTC', 'WBTC', 18))).contractAddress as Address;
-    testContracts.tokens.WETH = (await signer.sendTransaction(await ERC20Mock.populateTransaction.deploy('Wrapped Ether', 'WETH', 18))).contractAddress as Address;
-    testContracts.tokens.BNB  = (await signer.sendTransaction(await ERC20Mock.populateTransaction.deploy('BNB', 'BNB', 18))).contractAddress as Address;
-    testContracts.tokens.WXRP = (await signer.sendTransaction(await ERC20Mock.populateTransaction.deploy('Wrapped XRP', 'WXRP', 18))).contractAddress as Address;
-    testContracts.tokens.USDT = (await signer.sendTransaction(await ERC20Mock.populateTransaction.deploy('Tether USD', 'USDT', 6))).contractAddress as Address;
+    testContracts.tokens.WBTC = (await signer.sendTransaction(await ERC20WithFaucet.populateTransaction.deploy('Wrapped BTC',   'WBTC', 18,    1000000000000000000000n, ONE_DAY))).contractAddress as Address;
+    testContracts.tokens.WETH = (await signer.sendTransaction(await ERC20WithFaucet.populateTransaction.deploy('Wrapped Ether', 'WETH', 18,   10000000000000000000000n, ONE_DAY))).contractAddress as Address;
+    testContracts.tokens.BNB  = (await signer.sendTransaction(await ERC20WithFaucet.populateTransaction.deploy('BNB',           'BNB',  18,  100000000000000000000000n, ONE_DAY))).contractAddress as Address;
+    testContracts.tokens.WXRP = (await signer.sendTransaction(await ERC20WithFaucet.populateTransaction.deploy('Wrapped XRP',   'WXRP', 18, 1000000000000000000000000n, ONE_DAY))).contractAddress as Address;
+    testContracts.tokens.USDT = (await signer.sendTransaction(await ERC20WithFaucet.populateTransaction.deploy('Tether USD',    'USDT',  6,             1000000000000n, ONE_DAY))).contractAddress as Address;
 
     await setUpOrderbook(signer, 'WBTC/USDT', 1000000000000000n, 100000000n);
     await setUpOrderbook(signer, 'WETH/USDT', 10000000000000000n, 10000000n);
@@ -86,12 +88,13 @@ export async function createAuxSigner() {
     if (!await getBalance(signer.address)) {
         await global.ethereum?.send('evm_setAccountBalance', [ signer.address, hexstring(1000000000000000000000n) ]);
 
-        const { addressBook, tokens } = testContracts;
-        await signer.sendTransaction(await ERC20Mock.at(tokens.WBTC).populateTransaction.giveMe(1000000000000000000000n));
-        await signer.sendTransaction(await ERC20Mock.at(tokens.WETH).populateTransaction.giveMe(1000000000000000000000n));
-        await signer.sendTransaction(await ERC20Mock.at(tokens.BNB ).populateTransaction.giveMe(1000000000000000000000n));
-        await signer.sendTransaction(await ERC20Mock.at(tokens.WXRP).populateTransaction.giveMe(1000000000000000000000n));
-        await signer.sendTransaction(await ERC20Mock.at(tokens.USDT).populateTransaction.giveMe(1000000000000n));
+        const { addressBook, tokens: { WBTC, WETH, BNB, WXRP, USDT} } = testContracts;
+        await signer.sendTransaction(await ERC20WithFaucet.at(WBTC).populateTransaction.faucet());
+        await signer.sendTransaction(await ERC20WithFaucet.at(WETH).populateTransaction.faucet());
+        await signer.sendTransaction(await ERC20WithFaucet.at(BNB ).populateTransaction.faucet());
+        await signer.sendTransaction(await ERC20WithFaucet.at(WXRP).populateTransaction.faucet());
+        await signer.sendTransaction(await ERC20WithFaucet.at(USDT).populateTransaction.faucet());
+
         await signer.sendTransaction(await AddressBook.at(addressBook).populateTransaction.register());
     }
     return signer;
@@ -196,11 +199,10 @@ export async function simulateTicks(address: string, prices: bigint[], timeFrame
 }
 
 export async function giveMeFunds() {
-    const [ address ] = await getAccounts();
-    await global.ethereum?.send('evm_setAccountBalance', [ address, hexstring(1000000000000000000000n) ]);
-    await ERC20Mock.at('0xB9816fC57977D5A786E654c7CF76767be63b966e').giveMe(1000000000000000000000n);
-    await ERC20Mock.at('0x6D411e0A54382eD43F02410Ce1c7a7c122afA6E1').giveMe(1000000000000000000000n);
-    await ERC20Mock.at('0x5CF7F96627F3C9903763d128A1cc5D97556A6b99').giveMe(1000000000000000000000n);
-    await ERC20Mock.at('0xA3183498b579bd228aa2B62101C40CC1da978F24').giveMe(1000000000000000000000n);
-    await ERC20Mock.at('0x63f58053c9499E1104a6f6c6d2581d6D83067EEB').giveMe(1000000000000n);
+    const { tokens: { WBTC, WETH, BNB, WXRP, USDT} } = testContracts;
+    await ERC20WithFaucet.at(WBTC).faucet();
+    await ERC20WithFaucet.at(WETH).faucet();
+    await ERC20WithFaucet.at(BNB ).faucet();
+    await ERC20WithFaucet.at(WXRP).faucet();
+    await ERC20WithFaucet.at(USDT).faucet();
 }

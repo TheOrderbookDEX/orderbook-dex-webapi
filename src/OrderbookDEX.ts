@@ -209,9 +209,11 @@ export class OrderbookDEXInternal extends OrderbookDEX {
     }
 
     async getToken(address: Address, abortSignal?: AbortSignal): Promise<Token> {
+        const hasFaucet = this._config.tokensWithFaucet.includes(address);
         try {
             const token = await Database.instance.getToken(address, abortSignal);
-            return new Token({ ...token, tracked: token.tracked == TrackedFlag.TRACKED });
+            const tracked = token.tracked == TrackedFlag.TRACKED;
+            return new Token({ ...token, tracked, hasFaucet });
 
         } catch (error) {
             if (error instanceof NotInDatabase) {
@@ -221,7 +223,7 @@ export class OrderbookDEXInternal extends OrderbookDEX {
                 const symbol = await abortify(asyncCatchError(contract.symbol(), NotAnERC20Token));
                 const decimals = await abortify(asyncCatchError(contract.decimals(), NotAnERC20Token));
                 await Database.instance.saveToken({ tracked: TrackedFlag.NOT_TRACKED, address, name, symbol, decimals }, abortSignal);
-                return new Token({ tracked: false, address, name, symbol, decimals });
+                return new Token({ tracked: false, address, name, symbol, decimals, hasFaucet });
 
             } else {
                 throw error;
@@ -231,7 +233,9 @@ export class OrderbookDEXInternal extends OrderbookDEX {
 
     async * getTokens(abortSignal?: AbortSignal): AsyncIterable<Token> {
         for await (const token of Database.instance.getTrackedTokens(abortSignal)) {
-            yield new Token({ ...token, tracked: token.tracked == TrackedFlag.TRACKED });
+            const tracked = token.tracked == TrackedFlag.TRACKED;
+            const hasFaucet = this._config.tokensWithFaucet.includes(token.address);
+            yield new Token({ ...token, tracked, hasFaucet });
         }
     }
 
@@ -343,6 +347,7 @@ interface OrderbookDEXConfig {
     readonly operatorV1: Address;
     readonly orderbookFactoryV1: Address;
     readonly tokens: Address[];
+    readonly tokensWithFaucet: Address[];
     readonly orderbooks: Address[];
 }
 
@@ -357,6 +362,8 @@ orderbookDEXConfigs[5] = {
         '0xb4fbf271143f4fbf7b91a5ded31805e42b2208d6' as Address, // WETH
         '0xd87ba7a50b2e7e660f678a895e4b72e7cb4ccd9c' as Address, // USDC
     ],
+    tokensWithFaucet: [
+    ],
     orderbooks: [
         '0x24C2d6AA89b3DCC86a4d75cc85727136C5d5872f' as Address, // WBTC/USDC
         '0xe705DB4Ae1d5E82f14e08B865448ab14498D36fD' as Address, // WETH/USDC
@@ -368,6 +375,13 @@ export const devnetConfig = orderbookDEXConfigs[1337] = {
     operatorV1: '0xDe09E74d4888Bc4e65F589e8c13Bce9F71DdF4c7' as Address,
     orderbookFactoryV1: '0x51a240271AB8AB9f9a21C82d9a85396b704E164d' as Address,
     tokens: [
+        '0xB9816fC57977D5A786E654c7CF76767be63b966e' as Address,
+        '0x6D411e0A54382eD43F02410Ce1c7a7c122afA6E1' as Address,
+        '0x5CF7F96627F3C9903763d128A1cc5D97556A6b99' as Address,
+        '0xA3183498b579bd228aa2B62101C40CC1da978F24' as Address,
+        '0x63f58053c9499E1104a6f6c6d2581d6D83067EEB' as Address,
+    ],
+    tokensWithFaucet: [
         '0xB9816fC57977D5A786E654c7CF76767be63b966e' as Address,
         '0x6D411e0A54382eD43F02410Ce1c7a7c122afA6E1' as Address,
         '0x5CF7F96627F3C9903763d128A1cc5D97556A6b99' as Address,
