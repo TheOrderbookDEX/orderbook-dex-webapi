@@ -7,7 +7,7 @@ import { Chain, ChainNotConnected } from '../src/Chain';
 import { devnetConfig } from '../src/OrderbookDEX';
 import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-provider';
 import { resetIndexedDB } from './indexeddb';
-import { setUpSmartContracts, testContracts } from './smart-contracts';
+import { giveMeFunds, setUpSmartContracts, testContracts } from './smart-contracts';
 
 use(chaiAsPromised);
 
@@ -85,78 +85,117 @@ describe('OrderbookDEX', function() {
     });
 
     describe('instance', function() {
-        beforeEach(async function() {
-            await setUpEthereumProvider();
-            await Chain.connect();
-            await setUpSmartContracts();
-            await OrderbookDEX.connect();
+        describe('functions that do not require blockchain account', function() {
+            beforeEach(async function() {
+                await setUpEthereumProvider();
+                await Chain.connect();
+                await setUpSmartContracts();
+                await OrderbookDEX.connect();
+            });
+
+            afterEach(async function() {
+                OrderbookDEX.disconnect();
+                Chain.disconnect();
+                await tearDownEthereumProvider();
+                resetIndexedDB();
+            });
+
+            describe('getOrderbooks', function() {
+                it('should return all the orderbooks', async function() {
+                    const orderbooks: Orderbook[] = [];
+                    for await (const orderbook of OrderbookDEX.instance.getOrderbooks({})) {
+                        orderbooks.push(orderbook);
+                    }
+                    expect(orderbooks.map(({ address }) => address))
+                        .to.have.members(Object.values(testContracts.orderbooks).map(({ address }) => address));
+                    for (const orderbook of orderbooks) {
+                        const contract = IOrderbookV1.at(orderbook.address);
+                        expect(orderbook.version)
+                            .to.be.equal(await contract.version());
+                        expect(orderbook.tradedToken.address)
+                            .to.be.equal(await contract.tradedToken());
+                        expect(orderbook.baseToken.address)
+                            .to.be.equal(await contract.baseToken());
+                        expect(orderbook.contractSize)
+                            .to.be.equal(await contract.contractSize());
+                        expect(orderbook.priceTick)
+                            .to.be.equal(await contract.priceTick());
+                    }
+                });
+            });
+
+            describe('trackOrderbook', function() {
+                // TODO
+            });
+
+            describe('forgetOrderbook', function() {
+                // TODO
+            });
+
+            describe('getTokens', function() {
+                it('should return tracked tokens', async function() {
+                    const tokens = [];
+                    for await (const { address, name, symbol, decimals } of OrderbookDEX.instance.getTokens()) {
+                        tokens.push({ address, name, symbol, decimals });
+                    }
+                    expect(tokens.map(({ address }) => address))
+                        .to.have.members(devnetConfig.tokens);
+                    for (const token of tokens) {
+                        const contract = IERC20.at(token.address);
+                        expect(token.name)
+                            .to.be.equal(await contract.name());
+                        expect(token.symbol)
+                            .to.be.equal(await contract.symbol());
+                        expect(token.decimals)
+                            .to.be.equal(await contract.decimals());
+                    }
+                });
+            });
+
+            describe('trackToken', function() {
+                // TODO
+            });
+
+            describe('forgetToken', function() {
+                // TODO
+            });
         });
 
-        afterEach(async function() {
-            OrderbookDEX.disconnect();
-            Chain.disconnect();
-            await tearDownEthereumProvider();
-            resetIndexedDB();
-        });
+        describe('functions that require blockchain account', function() {
+            beforeEach(async function() {
+                await setUpEthereumProvider(true);
+                await Chain.connect();
+                await setUpSmartContracts();
+                await OrderbookDEX.connect();
+                await giveMeFunds();
+            });
 
-        describe('getOrderbooks', function() {
-            it('should return all the orderbooks', async function() {
-                const orderbooks: Orderbook[] = [];
-                for await (const orderbook of OrderbookDEX.instance.getOrderbooks({})) {
-                    orderbooks.push(orderbook);
-                }
-                expect(orderbooks.map(({ address }) => address))
-                    .to.have.members(Object.values(testContracts.orderbooks).map(({ address }) => address));
-                for (const orderbook of orderbooks) {
-                    const contract = IOrderbookV1.at(orderbook.address);
-                    expect(orderbook.version)
-                        .to.be.equal(await contract.version());
+            afterEach(async function() {
+                OrderbookDEX.disconnect();
+                Chain.disconnect();
+                await tearDownEthereumProvider();
+                resetIndexedDB();
+            });
+
+            describe('createOrderbook', function() {
+                it('should work', async function() {
+                    const { tokens: { WBTC, USDT } } = testContracts;
+                    const orderbook = await OrderbookDEX.instance.createOrderbook({
+                        tradedToken: await OrderbookDEX.instance.getToken(WBTC),
+                        baseToken: await OrderbookDEX.instance.getToken(USDT),
+                        contractSize: 1000000000000000n,
+                        priceTick: 100000000n,
+                    });
                     expect(orderbook.tradedToken.address)
-                        .to.be.equal(await contract.tradedToken());
+                        .to.be.equal(WBTC);
                     expect(orderbook.baseToken.address)
-                        .to.be.equal(await contract.baseToken());
+                        .to.be.equal(USDT);
                     expect(orderbook.contractSize)
-                        .to.be.equal(await contract.contractSize());
+                        .to.be.equal(1000000000000000n);
                     expect(orderbook.priceTick)
-                        .to.be.equal(await contract.priceTick());
-                }
+                        .to.be.equal(100000000n);
+                });
             });
-        });
-
-        describe('trackOrderbook', function() {
-            // TODO
-        });
-
-        describe('forgetOrderbook', function() {
-            // TODO
-        });
-
-        describe('getTokens', function() {
-            it('should return tracked tokens', async function() {
-                const tokens = [];
-                for await (const { address, name, symbol, decimals } of OrderbookDEX.instance.getTokens()) {
-                    tokens.push({ address, name, symbol, decimals });
-                }
-                expect(tokens.map(({ address }) => address))
-                    .to.have.members(devnetConfig.tokens);
-                for (const token of tokens) {
-                    const contract = IERC20.at(token.address);
-                    expect(token.name)
-                        .to.be.equal(await contract.name());
-                    expect(token.symbol)
-                        .to.be.equal(await contract.symbol());
-                    expect(token.decimals)
-                        .to.be.equal(await contract.decimals());
-                }
-            });
-        });
-
-        describe('trackToken', function() {
-            // TODO
-        });
-
-        describe('forgetToken', function() {
-            // TODO
         });
     });
 });

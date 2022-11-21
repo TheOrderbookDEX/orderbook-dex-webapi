@@ -323,6 +323,8 @@ export class OrderbookDEXInternal extends OrderbookDEX {
     async createOrderbook(properties: OrderbookProperties): Promise<Orderbook> {
         const { tradedToken, baseToken, contractSize, priceTick } = properties;
         const factory = IOrderbookFactoryV1.at(this._config.orderbookFactoryV1);
+        // call static to catch errors
+        await factory.callStatic.createOrderbook(tradedToken, baseToken, contractSize, priceTick);
         const { events } = await factory.createOrderbook(tradedToken, baseToken, contractSize, priceTick);
         const [ { orderbook } ] = events.filter(event => event instanceof OrderbookCreated) as OrderbookCreated[];
         return await this.getOrderbook(orderbook as Address);

@@ -3,7 +3,7 @@ import { OperatorFactory } from '@theorderbookdex/orderbook-dex-operator/dist/Op
 import { OrderbookFactoryV1 } from '@theorderbookdex/orderbook-dex-v1/dist/OrderbookFactoryV1';
 import { IOrderbookV1 } from '@theorderbookdex/orderbook-dex-v1/dist/interfaces/IOrderbookV1';
 import { IERC20 } from '@theorderbookdex/orderbook-dex/dist/interfaces/IERC20';
-import { createSigner, getBalance, getBlockNumber, getBlockTimestamp, hexstring, Signer } from '@frugal-wizard/abi2ts-lib';
+import { createSigner, getAccounts, getBalance, getBlockNumber, getBlockTimestamp, hexstring, Signer } from '@frugal-wizard/abi2ts-lib';
 import { EthereumProvider } from 'ganache';
 import { OperatorV1 } from '@theorderbookdex/orderbook-dex-v1-operator/dist/OperatorV1';
 import { Address, ZERO_ADDRESS } from '../src';
@@ -199,6 +199,9 @@ export async function simulateTicks(address: string, prices: bigint[], timeFrame
 }
 
 export async function giveMeFunds() {
+    const [ address ] = await getAccounts();
+    await global.ethereum?.send('evm_setAccountBalance', [ address, hexstring(1000000000000000000000n) ]);
+
     const { tokens: { WBTC, WETH, BNB, WXRP, USDT} } = testContracts;
     await ERC20WithFaucet.at(WBTC).faucet();
     await ERC20WithFaucet.at(WETH).faucet();
