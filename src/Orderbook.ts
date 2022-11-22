@@ -166,8 +166,7 @@ export async function fetchOrderbookData(address: Address, abortSignal?: AbortSi
         switch (version) {
             case Orderbook.V1: {
                 const orderbookFactory = IOrderbookFactoryV1.at(OrderbookDEXInternal.instance._config.orderbookFactoryV1);
-                // TODO fix in abi2ts-lib: 0 should be default value for fromBlock
-                const event = await asyncFirst(OrderbookCreated.get({ address: orderbookFactory.address, orderbook: address, fromBlock: 0 }));
+                const event = await asyncFirst(OrderbookCreated.get({ address: orderbookFactory.address, orderbook: address }));
                 checkAbortSignal(abortSignal);
                 if (!event) throw new NotAnOrderbook();
                 const { tradedToken, baseToken, contractSize, priceTick, blockNumber: creationBlockNumber } = event;
