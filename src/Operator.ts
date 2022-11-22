@@ -6,9 +6,10 @@ import { IOperatorFactory } from '@theorderbookdex/orderbook-dex-operator/dist/i
 import { getDevChainFunds } from './dev-chain';
 import { isUserRejectionError } from './ethereum';
 import { Orderbook } from './Orderbook';
-import { checkAbortSignal, createSubAbortController, max, min } from './utils';
+import { checkAbortSignal, createAbortifier, createSubAbortController, max, min } from './utils';
 import { ContractEvent, decodeErrorData, MAX_UINT32, Transaction } from '@frugal-wizard/abi2ts-lib';
 import { IERC20 } from '@theorderbookdex/orderbook-dex/dist/interfaces/IERC20';
+import { IERC20WithFaucet, FaucetOnCooldown as FaucetOnCooldownContractError } from '@theorderbookdex/orderbook-dex/dist/testing/interfaces/IERC20WithFaucet';
 import { Database } from './Database';
 import { OrderInternal, Order, OrderExecutionType, OrderStatus, OrderType, encodeOrderType } from './Order';
 import { now } from './time';
@@ -138,6 +139,20 @@ export abstract class Operator extends EventTarget {
      * @throws {RequestRejected} When the user rejects the request.
      */
     abstract withdraw(token: Token, amount: bigint, abortSignal?: AbortSignal): Promise<void>;
+
+    /**
+     * Call the faucet function of a token.
+     *
+     * @param token       The token.
+     * @param abortSignal A signal to abort. It won't stop the blockchain transaction, just
+     *                    prevent the promise from returning.
+     * @throws {RequestRejected} When the user rejects the request.
+     * @throws {TokenHasNoFaucet} When trying to call the faucet function of a token who
+     *                            does not have one.
+     * @throws {FaucetOnCooldown} When calling the faucet function of a token fails because
+     *                            it's on cooldown.
+     */
+    abstract faucet(token: Token, abortSignal?: AbortSignal): Promise<void>;
 
     /**
      * Get the orders of the user.
@@ -426,6 +441,33 @@ export class OperatorInternal extends Operator {
         }
         this.dispatchEvent(new TokenWithdrawnEvent(token, amount));
         checkAbortSignal(abortSignal);
+    }
+
+    async faucet(token: Token, abortSignal?: AbortSignal) {
+        if (!token.hasFaucet) {
+            throw new TokenHasNoFaucet();
+        }
+
+        const abortify = createAbortifier(abortSignal);
+
+        const tokenContract = IERC20WithFaucet.at(token.address);
+
+        try {
+            // call static to catch errors
+            await abortify(tokenContract.callStatic.faucet());
+            await abortify(tokenContract.faucet());
+
+        } catch (error) {
+            if (error instanceof FaucetOnCooldownContractError) {
+                throw new FaucetOnCooldown();
+
+            } else if (isUserRejectionError(error)) {
+                throw new RequestRejected();
+
+            } else {
+                throw error;
+            }
+        }
     }
 
     private trackOrder(order: OrderInternal) {
@@ -1019,5 +1061,25 @@ export class CannotDismissOrder extends Error {
     constructor() {
         super('Cannot Dismiss Order');
         this.name = 'CannotDismissOrder';
+    }
+}
+
+/**
+ * Error thrown when trying to call the faucet function of a token who does not have one.
+ */
+export class TokenHasNoFaucet extends Error {
+    constructor() {
+        super('Token Has No Faucet');
+        this.name = 'TokenHasNoFaucet';
+    }
+}
+
+/**
+ * Error thrown when calling the faucet function of a token fails because it's on cooldown.
+ */
+export class FaucetOnCooldown extends Error {
+    constructor() {
+        super('Faucet On Cooldown');
+        this.name = 'FaucetOnCooldown';
     }
 }

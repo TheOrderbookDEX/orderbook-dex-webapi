@@ -28,7 +28,7 @@ describe('Operator', function() {
     });
 
     describe('create', function() {
-        it('should create', async function() {
+        it('should work', async function() {
             await Operator.create();
         });
     });
@@ -39,7 +39,7 @@ describe('Operator', function() {
             Operator.disconnect();
         });
 
-        it('should connect', async function() {
+        it('should work', async function() {
             await Operator.connect();
         });
     });
@@ -69,6 +69,17 @@ describe('Operator', function() {
                 const token = await OrderbookDEX.instance.getToken(Object.values(testContracts.tokens)[0]);
                 await Operator.instance.withdraw(token, 1n);
             });
+        });
+    });
+
+    describe('faucet', function() {
+        beforeEach(async function() {
+            await Operator.create();
+        });
+
+        it('should work', async function() {
+            const token = await OrderbookDEX.instance.getToken(Object.values(testContracts.tokens)[0]);
+            await Operator.instance.faucet(token);
         });
     });
 
