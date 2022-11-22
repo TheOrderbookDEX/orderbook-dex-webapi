@@ -13,12 +13,12 @@
     "typecheck": "tsc"
   },
   "dependencies": {
-    "@frugal-wizard/abi2ts-lib": "^0.5.0",
-    "@frugal-wizard/addressbook": "1.3.0",
-    "@theorderbookdex/orderbook-dex": "1.0.0-rc.8",
-    "@theorderbookdex/orderbook-dex-operator": "1.0.0-rc.10",
-    "@theorderbookdex/orderbook-dex-v1": "1.0.0-rc.9",
-    "@theorderbookdex/orderbook-dex-v1-operator": "1.0.0-rc.3",
+    "@frugal-wizard/abi2ts-lib": "^0.5.1",
+    "@frugal-wizard/addressbook": "1.3.1",
+    "@theorderbookdex/orderbook-dex": "1.0.0-rc.9",
+    "@theorderbookdex/orderbook-dex-operator": "1.0.0-rc.11",
+    "@theorderbookdex/orderbook-dex-v1": "1.0.0-rc.10",
+    "@theorderbookdex/orderbook-dex-v1-operator": "1.0.0-rc.4",
     "idb": "^7.1.1"
   },
   "devDependencies": {
@@ -31,8 +31,8 @@
     "@types/mochawesome": "^6.2.1",
     "@types/node": "^18.11.9",
     "@types/rimraf": "^3.0.2",
-    "@typescript-eslint/eslint-plugin": "^5.43.0",
-    "@typescript-eslint/parser": "^5.43.0",
+    "@typescript-eslint/eslint-plugin": "^5.44.0",
+    "@typescript-eslint/parser": "^5.44.0",
     "chai": "^4.3.7",
     "chai-as-promised": "^7.1.1",
     "eslint": "^8.28.0",
