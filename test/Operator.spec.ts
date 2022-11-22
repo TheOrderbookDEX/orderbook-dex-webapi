@@ -165,6 +165,31 @@ describe('Operator', function() {
             });
         });
     });
+
+    describe('createOrderbook', function() {
+        beforeEach(async function() {
+            await Operator.create();
+            await giveMeFunds();
+        });
+
+        it('should work', async function() {
+            const { tokens: { WBTC, USDT } } = testContracts;
+            const orderbook = await Operator.instance.createOrderbook({
+                tradedToken: await OrderbookDEX.instance.getToken(WBTC),
+                baseToken: await OrderbookDEX.instance.getToken(USDT),
+                contractSize: 1000000000000000n,
+                priceTick: 100000000n,
+            });
+            expect(orderbook.tradedToken.address)
+                .to.be.equal(WBTC);
+            expect(orderbook.baseToken.address)
+                .to.be.equal(USDT);
+            expect(orderbook.contractSize)
+                .to.be.equal(1000000000000000n);
+            expect(orderbook.priceTick)
+                .to.be.equal(100000000n);
+        });
+    });
 });
 
 async function waitForOrdersPendingTransactions() {

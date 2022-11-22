@@ -1,12 +1,8 @@
-import { IOrderbookFactoryV1 } from '@theorderbookdex/orderbook-dex-v1/dist/interfaces/IOrderbookFactoryV1';
 import { IERC20 } from '@theorderbookdex/orderbook-dex/dist/interfaces/IERC20';
-import { OrderbookCreated } from '@theorderbookdex/orderbook-dex/dist/interfaces/IOrderbookFactory';
 import { Address } from './Address';
 import { Chain } from './Chain';
 import { Database, NotInDatabase, TrackedFlag } from './Database';
-import { isUserRejectionError } from './ethereum';
 import { GenericEventListener } from './event-types';
-import { RequestRejected } from './Operator';
 import { fetchOrderbookData, fetchOrderbooksData, Orderbook, OrderbookInternal } from './Orderbook';
 import { NotAnERC20Token, Token } from './Token';
 import { asyncCatchError, createAbortifier } from './utils';
@@ -126,16 +122,6 @@ export abstract class OrderbookDEX extends EventTarget {
      */
     abstract forgetOrderbook(orderbook: Orderbook, abortSignal?: AbortSignal): Promise<void>;
 
-    /**
-     * Create a new orderbook.
-     *
-     * @param properties The properties of the new orderbook.
-     * @param abortSignal A signal to abort. It won't stop the blockchain transaction, just
-     *                    prevent the promise from returning.
-     * @throws {RequestRejected} When the user rejects the request.
-     */
-    abstract createOrderbook(properties: OrderbookProperties, abortSignal?: AbortSignal): Promise<Orderbook>;
-
     addEventListener(type: OrderbookDEXEventType.TOKEN_ADDED, callback: GenericEventListener<TokenAddedEvent> | null, options?: boolean | AddEventListenerOptions): void;
     addEventListener(type: OrderbookDEXEventType.TOKEN_REMOVED, callback: GenericEventListener<TokenRemovedEvent> | null, options?: boolean | AddEventListenerOptions): void;
     addEventListener(type: OrderbookDEXEventType, callback: GenericEventListener<OrderbookDEXEvent> | null, options?: boolean | AddEventListenerOptions): void {
@@ -176,28 +162,6 @@ export interface OrderbookFilter {
      * Retrieve only orderbooks matching this base token.
      */
     baseToken?: Address;
-}
-
-export interface OrderbookProperties {
-    /**
-     * The traded token.
-     */
-    readonly tradedToken: Token;
-
-    /**
-     * The base token.
-     */
-    readonly baseToken: Token;
-
-    /**
-     * The size of a contract in traded token.
-     */
-    readonly contractSize: bigint;
-
-    /**
-     * The price tick in base token.
-     */
-    readonly priceTick: bigint;
 }
 
 export class OrderbookDEXInternal extends OrderbookDEX {
@@ -323,27 +287,6 @@ export class OrderbookDEXInternal extends OrderbookDEX {
             baseToken: orderbook.baseToken.address,
             tracked: TrackedFlag.NOT_TRACKED,
         }, abortSignal);
-    }
-
-    async createOrderbook(properties: OrderbookProperties, abortSignal?: AbortSignal): Promise<Orderbook> {
-        const { tradedToken, baseToken, contractSize, priceTick } = properties;
-        const abortify = createAbortifier(abortSignal);
-
-        const factory = IOrderbookFactoryV1.at(this._config.orderbookFactoryV1);
-
-        try {
-            // call static to catch errors
-            await abortify(factory.callStatic.createOrderbook(tradedToken, baseToken, contractSize, priceTick));
-            const { events } = await abortify(factory.createOrderbook(tradedToken, baseToken, contractSize, priceTick));
-            const [ { orderbook } ] = events.filter(event => event instanceof OrderbookCreated) as OrderbookCreated[];
-            return await abortify(this.getOrderbook(orderbook as Address, abortSignal));
-
-        } catch (error) {
-            if (isUserRejectionError(error)) {
-                throw new RequestRejected();
-            }
-            throw error;
-        }
     }
 }
 

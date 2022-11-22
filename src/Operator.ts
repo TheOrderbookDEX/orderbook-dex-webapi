@@ -18,6 +18,8 @@ import { Token } from './Token';
 import { Canceled, Filled, IOrderbookV1 } from '@theorderbookdex/orderbook-dex-v1/dist/interfaces/IOrderbookV1';
 import { ChainEvents } from './ChainEvents';
 import { IOperatorV1, BoughtAtMarketV1, SoldAtMarketV1, PlacedBuyOrderV1, PlacedSellOrderV1, Failed, OrderClaimedV1, OrderCanceledV1 } from '@theorderbookdex/orderbook-dex-v1-operator/dist/interfaces/IOperatorV1';
+import { IOrderbookFactoryV1 } from '@theorderbookdex/orderbook-dex-v1/dist/interfaces/IOrderbookFactoryV1';
+import { OrderbookCreated } from '@theorderbookdex/orderbook-dex/dist/interfaces/IOrderbookFactory';
 
 export interface TokenBalance {
     wallet: bigint;
@@ -265,6 +267,16 @@ export abstract class Operator extends EventTarget {
      */
     abstract dismissOrder(order: Order, abortSignal?: AbortSignal): Promise<void>;
 
+    /**
+     * Create a new orderbook.
+     *
+     * @param properties The properties of the new orderbook.
+     * @param abortSignal A signal to abort. It won't stop the blockchain transaction, just
+     *                    prevent the promise from returning.
+     * @throws {RequestRejected} When the user rejects the request.
+     */
+    abstract createOrderbook(properties: OrderbookProperties, abortSignal?: AbortSignal): Promise<Orderbook>;
+
     addEventListener(type: OperatorEventType.ORDER_CREATED, callback: GenericEventListener<OrderCreatedEvent> | null, options?: boolean | AddEventListenerOptions): void;
     addEventListener(type: OperatorEventType.ORDER_UPDATED, callback: GenericEventListener<OrderUpdatedEvent> | null, options?: boolean | AddEventListenerOptions): void;
     addEventListener(type: OperatorEventType.ORDER_REMOVED, callback: GenericEventListener<OrderRemovedEvent> | null, options?: boolean | AddEventListenerOptions): void;
@@ -290,6 +302,28 @@ export abstract class Operator extends EventTarget {
     protected constructor() {
         super();
     }
+}
+
+export interface OrderbookProperties {
+    /**
+     * The traded token.
+     */
+    readonly tradedToken: Token;
+
+    /**
+     * The base token.
+     */
+    readonly baseToken: Token;
+
+    /**
+     * The size of a contract in traded token.
+     */
+    readonly contractSize: bigint;
+
+    /**
+     * The price tick in base token.
+     */
+    readonly priceTick: bigint;
 }
 
 export class OperatorInternal extends Operator {
@@ -877,6 +911,27 @@ export class OperatorInternal extends Operator {
         }
         await Database.instance.deleteOrder(order.key, abortSignal);
         this.dispatchEvent(new OrderRemovedEvent(order));
+    }
+
+    async createOrderbook(properties: OrderbookProperties, abortSignal?: AbortSignal): Promise<Orderbook> {
+        const { tradedToken, baseToken, contractSize, priceTick } = properties;
+        const abortify = createAbortifier(abortSignal);
+
+        const factory = IOrderbookFactoryV1.at(OrderbookDEXInternal.instance._config.orderbookFactoryV1);
+
+        try {
+            // call static to catch errors
+            await abortify(factory.callStatic.createOrderbook(tradedToken, baseToken, contractSize, priceTick));
+            const { events } = await abortify(factory.createOrderbook(tradedToken, baseToken, contractSize, priceTick));
+            const [ { orderbook } ] = events.filter(event => event instanceof OrderbookCreated) as OrderbookCreated[];
+            return await abortify(OrderbookDEX.instance.getOrderbook(orderbook as Address, abortSignal));
+
+        } catch (error) {
+            if (isUserRejectionError(error)) {
+                throw new RequestRejected();
+            }
+            throw error;
+        }
     }
 }
 
