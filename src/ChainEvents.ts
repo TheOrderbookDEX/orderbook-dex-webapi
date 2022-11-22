@@ -1,5 +1,5 @@
 import { ContractEvent, getBlockNumber } from '@frugal-wizard/abi2ts-lib';
-import { checkAbortSignal } from './utils';
+import { abortPromise, checkAbortSignal, createAsyncQueue } from './utils';
 
 const UPDATE_INTERVAL = 15000;
 
@@ -100,5 +100,17 @@ export class ChainEvents {
                 this.listeners.delete(address);
             }
         }
+    }
+
+    feed(address: string, abortSignal: AbortSignal): AsyncIterable<ContractEvent> {
+        return createAsyncQueue<ContractEvent>(async (queue) => {
+            const listener = (event: ContractEvent) => queue(event);
+            ChainEvents.instance.on(address, listener);
+            try {
+                await abortPromise(abortSignal);
+            } finally {
+                ChainEvents.instance.off(address, listener);
+            }
+        });
     }
 }

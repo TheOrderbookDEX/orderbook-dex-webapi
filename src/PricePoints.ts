@@ -1,11 +1,13 @@
 import { ContractEvent, getBlockNumber } from '@frugal-wizard/abi2ts-lib';
-import { IOrderbookV1, Placed, Filled, Canceled } from '@theorderbookdex/orderbook-dex-v1/dist/interfaces/IOrderbookV1';
+import { IOperatorV1 } from '@theorderbookdex/orderbook-dex-v1-operator/dist/interfaces/IOperatorV1';
+import { Placed, Filled, Canceled } from '@theorderbookdex/orderbook-dex-v1/dist/interfaces/IOrderbookV1';
 import { Address } from './Address';
 import { ChainEvents } from './ChainEvents';
 import { GenericEventListener } from './event-types';
 import { EventTargetX } from './EventTargetX';
 import { OrderType } from './Order';
-import { checkAbortSignal, isAbortReason } from './utils';
+import { OrderbookDEXInternal } from './OrderbookDEX';
+import { checkAbortSignal, createAbortifier, isAbortReason } from './utils';
 
 export enum PricePointsEventType {
     /**
@@ -32,12 +34,12 @@ export abstract class PricePoints extends EventTargetX {
     /**
      * Sell price points.
      */
-    abstract get sell(): PricePoint[];
+    abstract get sell(): readonly PricePoint[];
 
     /**
      * Buy price points.
      */
-    abstract get buy(): PricePoint[];
+    abstract get buy(): readonly PricePoint[];
 
     addEventListener(type: PricePointsEventType.PRICE_POINT_ADDED, callback: GenericEventListener<PricePointAddedEvent> | null, options?: boolean | AddEventListenerOptions): void;
     addEventListener(type: PricePointsEventType.PRICE_POINT_REMOVED, callback: GenericEventListener<PricePointRemovedEvent> | null, options?: boolean | AddEventListenerOptions): void;
@@ -59,35 +61,66 @@ export abstract class PricePoints extends EventTargetX {
 }
 
 const SELL = 0;
-const BUY = 1;
 
 export class PricePointsInternal extends PricePoints {
     static async create(address: Address, limit: number, abortSignal?: AbortSignal) {
-        const orderbook = IOrderbookV1.at(address);
-        const blockTag = await getBlockNumber();
-        const sell: PricePoint[] = [];
-        let price = await orderbook.askPrice({ blockTag });
-        checkAbortSignal(abortSignal);
-        while (price) {
-            const pricePoint = await orderbook.pricePoint(SELL, price, { blockTag });
-            checkAbortSignal(abortSignal);
-            const available = pricePoint.totalPlaced - pricePoint.totalFilled;
-            sell.push({ price, available });
-            price = await orderbook.nextSellPrice(price);
-            checkAbortSignal(abortSignal);
-        }
-        const buy: PricePoint[] = [];
-        price = await orderbook.bidPrice({ blockTag });
-        checkAbortSignal(abortSignal);
-        while (price) {
-            const pricePoint = await orderbook.pricePoint(BUY, price, { blockTag });
-            checkAbortSignal(abortSignal);
-            const available = pricePoint.totalPlaced - pricePoint.totalFilled;
-            buy.push({ price, available });
-            price = await orderbook.nextBuyPrice(price);
-            checkAbortSignal(abortSignal);
-        }
+        const abortify = createAbortifier(abortSignal);
+
+        const blockTag = await abortify(getBlockNumber());
+
+        const { sell, buy } = await this.fetch(address, blockTag, abortSignal);
+
         return new PricePointsInternal(address, blockTag, limit, sell, buy);
+    }
+
+    private static readonly FETCH_BATCH = 10;
+
+    private static async fetch(address: Address, blockTag: number, abortSignal?: AbortSignal) {
+        const abortify = createAbortifier(abortSignal);
+
+        const operatorV1 = IOperatorV1.at(OrderbookDEXInternal.instance._config.operatorV1);
+
+        let sellDone = false;
+        let buyDone = false;
+
+        const sell: PricePoint[] = [];
+        const buy: PricePoint[] = [];
+
+        let prevSellPrice = 0n
+        let prevBuyPrice = 0n
+
+        while (!sellDone || !buyDone) {
+            const result = await abortify(operatorV1.pricePointsV1(
+                address,
+                prevSellPrice,
+                sellDone ? 0 : this.FETCH_BATCH,
+                prevBuyPrice,
+                buyDone ? 0 : this.FETCH_BATCH,
+                { blockTag }
+            ));
+
+            sell.push(...result.sell.map(([ price, available ]) => ({ price, available })));
+
+            if (result.sell.length) {
+                prevSellPrice = result.sell[result.sell.length-1][0];
+            }
+
+            if (result.sell.length < this.FETCH_BATCH) {
+                sellDone = true;
+            }
+
+            buy.push(...result.buy.map(([ price, available ]) => ({ price, available })));
+
+            if (result.buy.length) {
+                prevBuyPrice = result.buy[result.buy.length-1][0];
+            }
+
+            if (result.buy.length < this.FETCH_BATCH) {
+                buyDone = true;
+            }
+        }
+
+        return { sell, buy };
     }
 
     constructor(
@@ -100,11 +133,11 @@ export class PricePointsInternal extends PricePoints {
         super();
     }
 
-    get sell(): PricePoint[] {
+    get sell(): readonly PricePoint[] {
         return this._sell.slice(0, this._limit);
     }
 
-    get buy(): PricePoint[] {
+    get buy(): readonly PricePoint[] {
         return this._buy.slice(0, this._limit);
     }
 
@@ -112,29 +145,25 @@ export class PricePointsInternal extends PricePoints {
 
     protected _activateUpdater() {
         this._updaterAbortController = new AbortController();
+
         const abortSignal = this._updaterAbortController.signal;
         const address = this._address;
         const fromBlock = this._sinceBlock + 1;
+        const toBlock = ChainEvents.instance.latestBlockNumber;
+        const feed = ChainEvents.instance.feed(address, abortSignal);
+        const backlog = ContractEvent.get({ address, fromBlock, toBlock });
+
         void (async () => {
             try {
-                const toBlock = ChainEvents.instance.latestBlockNumber;
-                checkAbortSignal(abortSignal);
-                const pendingEvents: ContractEvent[] = [];
-                let onEvent: (event: ContractEvent) => void;
-                onEvent = event => pendingEvents.push(event);
-                const listener = (event: ContractEvent) => onEvent(event);
-                ChainEvents.instance.on(address, listener);
-                abortSignal.addEventListener('abort', () => ChainEvents.instance.off(address, listener), { once: true });
-                if (fromBlock <= toBlock) {
-                    for await (const event of ContractEvent.get({ address, fromBlock, toBlock, events: [ Placed, Filled, Canceled ] })) {
-                        this._update(event);
-                    }
-                    checkAbortSignal(abortSignal);
+                for await (const event of backlog) {
+                    checkAbortSignal(abortSignal); // ContractEvent.get does not use abort signal
+                    await this._update(event);
                 }
-                for (const event of pendingEvents) {
-                    this._update(event);
+
+                for await (const event of feed) {
+                    await this._update(event);
                 }
-                onEvent = event => this._update(event);
+
             } catch (error) {
                 if (!isAbortReason(abortSignal, error)) {
                     throw error;
@@ -150,8 +179,10 @@ export class PricePointsInternal extends PricePoints {
 
     private _update(event: ContractEvent) {
         this._sinceBlock = event.blockNumber;
+
         if (event instanceof Placed) {
             this._increase(event.orderType, event.price, event.amount);
+
         } else if (event instanceof Filled || event instanceof Canceled) {
             this._decrease(event.orderType, event.price, event.amount);
         }
@@ -161,6 +192,7 @@ export class PricePointsInternal extends PricePoints {
         const pricePoints = type == SELL ? this._sell : this._buy;
         const index = pricePoints.findIndex(pricePoint => type == SELL ? pricePoint.price >= price : pricePoint.price <= price);
         const orderType = type == SELL ? OrderType.SELL : OrderType.BUY;
+
         if (index >= 0) {
             if (pricePoints[index].price == price) {
                 const available = pricePoints[index].available + amount;
@@ -168,17 +200,21 @@ export class PricePointsInternal extends PricePoints {
                 if (index < this._limit) {
                     this.dispatchEvent(new PricePointUpdatedEvent(orderType, price, available));
                 }
+
             } else {
                 pricePoints.splice(index, 0, { price, available: amount });
                 if (index < this._limit) {
                     if (pricePoints.length > this._limit) {
                         this.dispatchEvent(new PricePointRemovedEvent(orderType, pricePoints[this._limit].price));
                     }
+
                     this.dispatchEvent(new PricePointAddedEvent(orderType, price, amount));
                 }
             }
+
         } else {
             pricePoints.push({ price, available: amount });
+
             if (pricePoints.length <= this._limit) {
                 this.dispatchEvent(new PricePointAddedEvent(orderType, price, amount));
             }
@@ -189,17 +225,23 @@ export class PricePointsInternal extends PricePoints {
         const pricePoints = type == SELL ? this._sell : this._buy;
         const index = pricePoints.findIndex(pricePoint => pricePoint.price == price);
         const orderType = type == SELL ? OrderType.SELL : OrderType.BUY;
+
         if (index >= 0) {
             const available = pricePoints[index].available - amount;
+
             if (available > 0) {
                 pricePoints[index] = { price, available };
+
                 if (index < this._limit) {
                     this.dispatchEvent(new PricePointUpdatedEvent(orderType, price, available));
                 }
+
             } else {
                 pricePoints.splice(index, 1);
+
                 if (index < this._limit) {
                     this.dispatchEvent(new PricePointRemovedEvent(orderType, price));
+
                     if (pricePoints.length >= this._limit) {
                         const { price, available } = pricePoints[this._limit-1];
                         this.dispatchEvent(new PricePointAddedEvent(orderType, price, available));
@@ -217,12 +259,12 @@ export interface PricePoint {
     /**
      * The price in base token.
      */
-    price: bigint;
+    readonly price: bigint;
 
     /**
      * The amount of contracts available.
      */
-    available: bigint;
+    readonly available: bigint;
 }
 
 /**
