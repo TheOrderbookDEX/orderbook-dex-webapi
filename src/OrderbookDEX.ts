@@ -4,7 +4,9 @@ import { OrderbookCreated } from '@theorderbookdex/orderbook-dex/dist/interfaces
 import { Address } from './Address';
 import { Chain } from './Chain';
 import { Database, NotInDatabase, TrackedFlag } from './Database';
+import { isUserRejectionError } from './ethereum';
 import { GenericEventListener } from './event-types';
+import { RequestRejected } from './Operator';
 import { fetchOrderbookData, fetchOrderbooksData, Orderbook, OrderbookInternal } from './Orderbook';
 import { NotAnERC20Token, Token } from './Token';
 import { asyncCatchError, createAbortifier } from './utils';
@@ -128,8 +130,11 @@ export abstract class OrderbookDEX extends EventTarget {
      * Create a new orderbook.
      *
      * @param properties The properties of the new orderbook.
+     * @param abortSignal A signal to abort. It won't stop the blockchain transaction, just
+     *                    prevent the promise from returning.
+     * @throws {RequestRejected} When the user rejects the request.
      */
-    abstract createOrderbook(properties: OrderbookProperties): Promise<Orderbook>;
+    abstract createOrderbook(properties: OrderbookProperties, abortSignal?: AbortSignal): Promise<Orderbook>;
 
     addEventListener(type: OrderbookDEXEventType.TOKEN_ADDED, callback: GenericEventListener<TokenAddedEvent> | null, options?: boolean | AddEventListenerOptions): void;
     addEventListener(type: OrderbookDEXEventType.TOKEN_REMOVED, callback: GenericEventListener<TokenRemovedEvent> | null, options?: boolean | AddEventListenerOptions): void;
@@ -320,14 +325,25 @@ export class OrderbookDEXInternal extends OrderbookDEX {
         }, abortSignal);
     }
 
-    async createOrderbook(properties: OrderbookProperties): Promise<Orderbook> {
+    async createOrderbook(properties: OrderbookProperties, abortSignal?: AbortSignal): Promise<Orderbook> {
         const { tradedToken, baseToken, contractSize, priceTick } = properties;
+        const abortify = createAbortifier(abortSignal);
+
         const factory = IOrderbookFactoryV1.at(this._config.orderbookFactoryV1);
-        // call static to catch errors
-        await factory.callStatic.createOrderbook(tradedToken, baseToken, contractSize, priceTick);
-        const { events } = await factory.createOrderbook(tradedToken, baseToken, contractSize, priceTick);
-        const [ { orderbook } ] = events.filter(event => event instanceof OrderbookCreated) as OrderbookCreated[];
-        return await this.getOrderbook(orderbook as Address);
+
+        try {
+            // call static to catch errors
+            await abortify(factory.callStatic.createOrderbook(tradedToken, baseToken, contractSize, priceTick));
+            const { events } = await abortify(factory.createOrderbook(tradedToken, baseToken, contractSize, priceTick));
+            const [ { orderbook } ] = events.filter(event => event instanceof OrderbookCreated) as OrderbookCreated[];
+            return await abortify(this.getOrderbook(orderbook as Address, abortSignal));
+
+        } catch (error) {
+            if (isUserRejectionError(error)) {
+                throw new RequestRejected();
+            }
+            throw error;
+        }
     }
 }
 

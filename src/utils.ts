@@ -4,9 +4,15 @@ export function checkAbortSignal(abortSignal?: AbortSignal) {
 
 export function createAbortifier(abortSignal?: AbortSignal): <T>(promise: Promise<T>) => Promise<T> {
     return async <T>(promise: Promise<T>) => {
-        const result = await promise;
-        checkAbortSignal(abortSignal);
-        return result;
+        try {
+            const result = await promise;
+            checkAbortSignal(abortSignal);
+            return result;
+
+        } catch (error) {
+            checkAbortSignal(abortSignal);
+            throw error;
+        }
     };
 }
 
