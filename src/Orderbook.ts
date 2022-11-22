@@ -21,6 +21,11 @@ export abstract class Orderbook {
     }
 
     /**
+     * Whether the orderbook is being tracked.
+     */
+    abstract get tracked(): boolean;
+
+    /**
      * The address of the orderbook.
      */
     abstract get address(): Address;
@@ -85,6 +90,7 @@ export abstract class Orderbook {
 }
 
 export class OrderbookInternal extends Orderbook {
+    public readonly tracked: boolean;
     public readonly address: Address;
     public readonly version: bigint;
     public readonly tradedToken: Token;
@@ -107,6 +113,7 @@ export class OrderbookInternal extends Orderbook {
 
     constructor(properties: OrderbookProperties) {
         super();
+        this.tracked             = properties.tracked;
         this.address             = properties.address;
         this.version             = properties.version;
         this.tradedToken         = properties.tradedToken;
@@ -118,6 +125,7 @@ export class OrderbookInternal extends Orderbook {
 }
 
 interface OrderbookProperties {
+    readonly tracked: boolean;
     readonly address: Address;
     readonly version: bigint;
     readonly tradedToken: Token;

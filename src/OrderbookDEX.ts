@@ -254,21 +254,21 @@ export class OrderbookDEXInternal extends OrderbookDEX {
             if (filter.tracked && orderbook.tracked != TrackedFlag.TRACKED) continue;
             if (filter.tradedToken && filter.tradedToken != orderbook.tradedToken) continue;
             if (filter.baseToken && filter.baseToken != orderbook.baseToken) continue;
+            const tracked = orderbook.tracked == TrackedFlag.TRACKED;
             const tradedToken = await this.getToken(orderbook.tradedToken, abortSignal);
             if (!tradedToken.tracked) continue;
             const baseToken = await this.getToken(orderbook.baseToken, abortSignal);
             if (!tradedToken.tracked) continue;
-            yield new OrderbookInternal({ ...orderbook, tradedToken, baseToken });
+            yield new OrderbookInternal({ ...orderbook, tracked, tradedToken, baseToken });
         }
     }
 
     async getOrderbook(address: Address, abortSignal?: AbortSignal): Promise<OrderbookInternal> {
         const orderbook = await fetchOrderbookData(address, abortSignal);
-        return new OrderbookInternal({
-            ...orderbook,
-            tradedToken: await this.getToken(orderbook.tradedToken, abortSignal),
-            baseToken: await this.getToken(orderbook.baseToken, abortSignal),
-        });
+        const tracked = orderbook.tracked == TrackedFlag.TRACKED;
+        const tradedToken = await this.getToken(orderbook.tradedToken, abortSignal);
+        const baseToken = await this.getToken(orderbook.baseToken, abortSignal);
+        return new OrderbookInternal({ ...orderbook, tracked, tradedToken, baseToken });
     }
 
     async trackOrderbook(orderbook: OrderbookInternal, abortSignal?: AbortSignal): Promise<void> {
