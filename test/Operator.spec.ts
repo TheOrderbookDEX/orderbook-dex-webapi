@@ -3,6 +3,7 @@ import { expect, use } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import { Chain, Order, OrderbookDEX, Operator, OperatorEventType } from '../src';
 import { Database } from '../src/Database';
+import { FaucetUsedEvent } from '../src/Operator';
 import { setUpEthereumProvider, tearDownEthereumProvider } from './ethereum-provider';
 import { resetIndexedDB } from './indexeddb';
 import { giveMeFunds, setUpSmartContracts, testContracts } from './smart-contracts';
@@ -80,6 +81,28 @@ describe('Operator', function() {
         it('should work', async function() {
             const token = await OrderbookDEX.instance.getToken(Object.values(testContracts.tokens)[0]);
             await Operator.instance.faucet(token);
+        });
+
+        it('should trigger event', async function() {
+            const abortController = new AbortController();
+
+            const events: FaucetUsedEvent[] = [];
+
+            Operator.instance.addEventListener(OperatorEventType.FAUCET_USED, event => {
+                events.push(event);
+            }, { signal: abortController.signal });
+
+            try {
+                const token = await OrderbookDEX.instance.getToken(Object.values(testContracts.tokens)[0]);
+                await Operator.instance.faucet(token);
+                expect(events)
+                    .to.have.length(1);
+                expect(events[0].token.address)
+                    .to.be.equal(token.address);
+
+            } finally {
+                abortController.abort();
+            }
         });
     });
 

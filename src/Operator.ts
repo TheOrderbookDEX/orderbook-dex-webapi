@@ -21,11 +21,6 @@ import { IOperatorV1, BoughtAtMarketV1, SoldAtMarketV1, PlacedBuyOrderV1, Placed
 import { IOrderbookFactoryV1 } from '@theorderbookdex/orderbook-dex-v1/dist/interfaces/IOrderbookFactoryV1';
 import { OrderbookCreated } from '@theorderbookdex/orderbook-dex/dist/interfaces/IOrderbookFactory';
 
-export interface TokenBalance {
-    wallet: bigint;
-    operator: bigint;
-}
-
 export enum OperatorEventType {
     /**
      * Event type dispatched when an order is created.
@@ -51,6 +46,11 @@ export enum OperatorEventType {
      * Event type dispatched when tokens have been withdrawn from the operator.
      */
     TOKEN_WITHDRAWN = 'tokenWithdrawn',
+
+    /**
+     * Event type dispatched after successfully requesting tokens from faucet.
+     */
+    FAUCET_USED = 'faucetUsed',
 }
 
 /**
@@ -282,6 +282,7 @@ export abstract class Operator extends EventTarget {
     addEventListener(type: OperatorEventType.ORDER_REMOVED, callback: GenericEventListener<OrderRemovedEvent> | null, options?: boolean | AddEventListenerOptions): void;
     addEventListener(type: OperatorEventType.TOKEN_DEPOSITED, callback: GenericEventListener<TokenDepositedEvent> | null, options?: boolean | AddEventListenerOptions): void;
     addEventListener(type: OperatorEventType.TOKEN_WITHDRAWN, callback: GenericEventListener<TokenWithdrawnEvent> | null, options?: boolean | AddEventListenerOptions): void;
+    addEventListener(type: OperatorEventType.FAUCET_USED, callback: GenericEventListener<FaucetUsedEvent> | null, options?: boolean | AddEventListenerOptions): void;
     addEventListener(type: OperatorEventType, callback: GenericEventListener<OperatorEvent> | null, options?: boolean | AddEventListenerOptions): void {
         super.addEventListener(type, callback, options);
     }
@@ -291,6 +292,7 @@ export abstract class Operator extends EventTarget {
     removeEventListener(type: OperatorEventType.ORDER_REMOVED, callback: GenericEventListener<OrderRemovedEvent> | null, options?: boolean | AddEventListenerOptions): void;
     removeEventListener(type: OperatorEventType.TOKEN_DEPOSITED, callback: GenericEventListener<TokenDepositedEvent> | null, options?: boolean | AddEventListenerOptions): void;
     removeEventListener(type: OperatorEventType.TOKEN_WITHDRAWN, callback: GenericEventListener<TokenWithdrawnEvent> | null, options?: boolean | AddEventListenerOptions): void;
+    removeEventListener(type: OperatorEventType.FAUCET_USED, callback: GenericEventListener<FaucetUsedEvent> | null, options?: boolean | AddEventListenerOptions): void;
     removeEventListener(type: OperatorEventType, callback: GenericEventListener<OperatorEvent> | null, options?: boolean | EventListenerOptions): void {
         super.removeEventListener(type, callback, options);
     }
@@ -302,6 +304,11 @@ export abstract class Operator extends EventTarget {
     protected constructor() {
         super();
     }
+}
+
+export interface TokenBalance {
+    wallet: bigint;
+    operator: bigint;
 }
 
 export interface OrderbookProperties {
@@ -490,6 +497,7 @@ export class OperatorInternal extends Operator {
             // call static to catch errors
             await abortify(tokenContract.callStatic.faucet());
             await abortify(tokenContract.faucet());
+            this.dispatchEvent(new FaucetUsedEvent(token));
 
         } catch (error) {
             if (error instanceof FaucetOnCooldownContractError) {
@@ -1034,6 +1042,15 @@ export class TokenDepositedEvent extends OperatorEvent {
 export class TokenWithdrawnEvent extends OperatorEvent {
     constructor(readonly token: Token, readonly amount: bigint) {
         super(OperatorEventType.TOKEN_WITHDRAWN);
+    }
+}
+
+/**
+ * Event dispatched after successfully requesting tokens from faucet.
+ */
+export class FaucetUsedEvent extends OperatorEvent {
+    constructor(readonly token: Token) {
+        super(OperatorEventType.FAUCET_USED);
     }
 }
 
