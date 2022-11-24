@@ -365,6 +365,11 @@ orderbookDEXConfigs[5] = {
         '0xF7717f2cd227B4Ac266eB10d3225783f0C8B94a2' as Address, // USDT
     ],
     tokensWithFaucet: [
+        '0x7FFaFDFD84fdc7EBEbF055AbD32e075013351dac' as Address, // WBTC
+        '0xC648b5cEa6bb4707dF69BDB54CdcD1120B164A14' as Address, // WETH
+        '0xab305E379e22d520Aa7715B17F068975eC59F7A4' as Address, // BNB
+        '0xf2996fAeee7E3760a50192631C56bda595D7CE15' as Address, // WXRP
+        '0xF7717f2cd227B4Ac266eB10d3225783f0C8B94a2' as Address, // USDT
     ],
     orderbooks: [
         '0x5F3B683488Bf46B655d3Ba81648E1123D24Fada5' as Address, // WBTC/USDT
