@@ -354,25 +354,29 @@ interface OrderbookDEXConfig {
 export const orderbookDEXConfigs: { [chainId: number]: OrderbookDEXConfig | undefined } = {};
 
 orderbookDEXConfigs[5] = {
-    operatorFactory: '0x7BF5889661f06B7d287C6acBA754d318F17E4A52' as Address,
-    operatorV1: '0x0000000000000000000000000000000000000000' as Address,
-    orderbookFactoryV1: '0xdFbd8e2360B96C0bd4A00d4D1271A33f0C6E75C7' as Address,
+    operatorFactory:    '0x8D6d10630a8Cf88519a9C38AA4F486492Bee62D4' as Address,
+    operatorV1:         '0x7baB64F1c9339CCd275209a7ad02cCb9099AF79f' as Address,
+    orderbookFactoryV1: '0x91F5DE6F3cC09FbCa49AC4Ad5c24C66b997812c8' as Address,
     tokens: [
-        '0xc04b0d3107736c32e19f1c62b2af67be61d63a05' as Address, // WBTC
-        '0xb4fbf271143f4fbf7b91a5ded31805e42b2208d6' as Address, // WETH
-        '0xd87ba7a50b2e7e660f678a895e4b72e7cb4ccd9c' as Address, // USDC
+        '0x7FFaFDFD84fdc7EBEbF055AbD32e075013351dac' as Address, // WBTC
+        '0xC648b5cEa6bb4707dF69BDB54CdcD1120B164A14' as Address, // WETH
+        '0xab305E379e22d520Aa7715B17F068975eC59F7A4' as Address, // BNB
+        '0xf2996fAeee7E3760a50192631C56bda595D7CE15' as Address, // WXRP
+        '0xF7717f2cd227B4Ac266eB10d3225783f0C8B94a2' as Address, // USDT
     ],
     tokensWithFaucet: [
     ],
     orderbooks: [
-        '0x24C2d6AA89b3DCC86a4d75cc85727136C5d5872f' as Address, // WBTC/USDC
-        '0xe705DB4Ae1d5E82f14e08B865448ab14498D36fD' as Address, // WETH/USDC
+        '0x5F3B683488Bf46B655d3Ba81648E1123D24Fada5' as Address, // WBTC/USDT
+        '0x8f63a91ce930a1221474D6A65b9b3A50831e2a1b' as Address, // WETH/USDT
+        '0xDB1Ed563bE2225ca79932A2B62299141db35C5F9' as Address, // BNB/USDT
+        '0xE47cEecBaA451919A942fcCDb70aFE4cFfE61C82' as Address, // WXRP/USDT
     ],
 };
 
 export const devnetConfig = orderbookDEXConfigs[1337] = {
-    operatorFactory: '0x2946259E0334f33A064106302415aD3391BeD384' as Address,
-    operatorV1: '0xDe09E74d4888Bc4e65F589e8c13Bce9F71DdF4c7' as Address,
+    operatorFactory:    '0x2946259E0334f33A064106302415aD3391BeD384' as Address,
+    operatorV1:         '0xDe09E74d4888Bc4e65F589e8c13Bce9F71DdF4c7' as Address,
     orderbookFactoryV1: '0x51a240271AB8AB9f9a21C82d9a85396b704E164d' as Address,
     tokens: [
         '0xB9816fC57977D5A786E654c7CF76767be63b966e' as Address,
