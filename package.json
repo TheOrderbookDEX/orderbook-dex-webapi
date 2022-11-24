@@ -1,6 +1,6 @@
 {
   "name": "@theorderbookdex/orderbook-dex-webapi",
-  "version": "0.1.0-rc.13",
+  "version": "0.1.0-rc.14",
   "description": "This package provides a web service like interface to The Orderbook DEX on-chain data",
   "license": "BUSL-1.1",
   "author": "The Orderbook DEX Team",
