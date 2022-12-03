@@ -1,5 +1,5 @@
 import { ContractEvent, getBlockNumber } from '@frugal-wizard/abi2ts-lib';
-import { abortPromise, checkAbortSignal, createAsyncQueue } from './utils';
+import { abortPromise, createAsyncQueue } from './utils';
 
 const UPDATE_INTERVAL = 15000;
 
@@ -51,16 +51,14 @@ export class ChainEvents {
     private async update() {
         const abortSignal = this.abortController.signal;
         try {
-            const currentBlockNumber = await getBlockNumber();
-            checkAbortSignal(abortSignal);
+            const currentBlockNumber = await getBlockNumber(abortSignal);
             if (this._latestBlockNumber < currentBlockNumber) {
                 const fromBlock = this._latestBlockNumber + 1;
                 const toBlock = currentBlockNumber;
                 this._latestBlockNumber = currentBlockNumber;
                 // TODO we should be able to fetch events for multiple addresses in one operation
                 for (const [address, callbacks] of this.listeners.entries()) {
-                    for await (const event of ContractEvent.get({ address, fromBlock, toBlock })) {
-                        checkAbortSignal(abortSignal);
+                    for await (const event of ContractEvent.get({ address, fromBlock, toBlock }, abortSignal)) {
                         for (const callback of callbacks) {
                             try {
                                 callback(event);

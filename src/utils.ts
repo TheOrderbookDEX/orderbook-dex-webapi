@@ -1,21 +1,3 @@
-export function checkAbortSignal(abortSignal?: AbortSignal) {
-    if (abortSignal?.aborted) throw abortSignal.reason;
-}
-
-export function createAbortifier(abortSignal?: AbortSignal): <T>(promise: Promise<T>) => Promise<T> {
-    return async <T>(promise: Promise<T>) => {
-        try {
-            const result = await promise;
-            checkAbortSignal(abortSignal);
-            return result;
-
-        } catch (error) {
-            checkAbortSignal(abortSignal);
-            throw error;
-        }
-    };
-}
-
 export function isAbortReason(abortSignal: AbortSignal | undefined, error: unknown) {
     return abortSignal?.aborted && abortSignal.reason === error;
 }

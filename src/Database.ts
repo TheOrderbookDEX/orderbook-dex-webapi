@@ -1,7 +1,6 @@
 import { DBSchema, IDBPDatabase, IDBPTransaction, openDB } from 'idb';
 import { Address } from './Address';
 import { OrderExecutionType, OrderStatus, OrderType } from './Order';
-import { checkAbortSignal, createAbortifier } from './utils';
 
 export class Database {
     private static _instance?: Database;
@@ -61,106 +60,173 @@ export class Database {
     constructor(private readonly _db: IDBPDatabase<DatabaseSchemaV1>) {}
 
     async getSetting<T extends keyof Settings>(name: T, abortSignal?: AbortSignal): Promise<Settings[T] | undefined> {
-        const abortify = createAbortifier(abortSignal);
-        return (await abortify(this._db.get('settings', name)))?.value as Settings[T];
+        try {
+            return (await this._db.get('settings', name))?.value as Settings[T];
+
+        } finally {
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
+        }
     }
 
     async setSetting<T extends keyof Settings>(name: T, value: Settings[T], abortSignal?: AbortSignal): Promise<void> {
-        const abortify = createAbortifier(abortSignal);
-        await abortify(this._db.put('settings', { name, value }));
+        try {
+            await this._db.put('settings', { name, value });
+
+        } finally {
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
+        }
     }
 
     async getBlockTimestamp(blockNumber: number, abortSignal?: AbortSignal) {
-        const abortify = createAbortifier(abortSignal);
-        const block = await abortify(this._db.get('blocks', blockNumber));
-        if (!block) throw new NotInDatabase;
-        return block.timestamp;
+        try {
+            const block = await this._db.get('blocks', blockNumber);
+            if (!block) throw new NotInDatabase;
+            return block.timestamp;
+
+        } finally {
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
+        }
     }
 
     async saveBlockTimestamp(blockNumber: number, timestamp: number, abortSignal?: AbortSignal) {
-        const abortify = createAbortifier(abortSignal);
-        await abortify(this._db.put('blocks', { blockNumber, timestamp }));
-        return timestamp;
+        try {
+            await this._db.put('blocks', { blockNumber, timestamp });
+            return timestamp;
+
+        } finally {
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
+        }
     }
 
     async * getTrackedTokens(abortSignal?: AbortSignal): AsyncIterable<TokenData> {
-        const abortify = createAbortifier(abortSignal);
-        // TODO fetch the tokens in batches
-        // in indexeddb string < array, that's why we use an empty array for they query
-        const query = IDBKeyRange.bound([TrackedFlag.TRACKED], [TrackedFlag.TRACKED, []]);
-        for (const token of await abortify(this._db.getAllFromIndex('tokens', 'tracked', query))) {
-            yield token;
+        try {
+            // TODO fetch the tokens in batches
+            // in indexeddb string < array, that's why we use an empty array for they query
+            const query = IDBKeyRange.bound([TrackedFlag.TRACKED], [TrackedFlag.TRACKED, []]);
+            for (const token of await this._db.getAllFromIndex('tokens', 'tracked', query)) {
+                try {
+                    yield token;
+
+                } finally {
+                    // eslint-disable-next-line no-unsafe-finally
+                    if (abortSignal?.aborted) throw abortSignal.reason;
+                }
+            }
+
+        } finally {
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
         }
     }
 
     async getToken(address: Address, abortSignal?: AbortSignal) {
-        const abortify = createAbortifier(abortSignal);
-        const token = await abortify(this._db.get('tokens', address));
-        if (!token) throw new NotInDatabase;
-        return token;
+        try {
+            const token = await this._db.get('tokens', address);
+            if (!token) throw new NotInDatabase;
+            return token;
+
+        } finally {
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
+        }
     }
 
     async saveToken(token: TokenData, abortSignal?: AbortSignal) {
-        const abortify = createAbortifier(abortSignal);
-        const { tracked, address, name, symbol, decimals } = token;
-        await abortify(this._db.put('tokens', { tracked, address, name, symbol, decimals }));
+        try {
+            const { tracked, address, name, symbol, decimals } = token;
+            await this._db.put('tokens', { tracked, address, name, symbol, decimals });
+
+        } finally {
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
+        }
     }
 
     static readonly GET_ORDERBOOKS_BATCH = 10;
 
     async * getOrderbooks(factory: Address, abortSignal?: AbortSignal) {
-        const abortify = createAbortifier(abortSignal);
-        const lastIndex = await this.getLastFactoryIndex(factory, abortSignal);
-        if (!lastIndex) return;
-        // due to how indexeddb works, we first fetch a batch then yield it
-        for (let index = 0; index <= lastIndex; index += Database.GET_ORDERBOOKS_BATCH) {
-            const query = IDBKeyRange.bound([factory, index], [factory, index + Database.GET_ORDERBOOKS_BATCH - 1]);
-            for (const orderbook of await abortify(this._db.getAllFromIndex('orderbooks', 'byFactoryIndex', query))) {
-                yield orderbook;
+        try {
+            const lastIndex = await this.getLastFactoryIndex(factory, abortSignal);
+            if (!lastIndex) return;
+            // due to how indexeddb works, we first fetch a batch then yield it
+            for (let index = 0; index <= lastIndex; index += Database.GET_ORDERBOOKS_BATCH) {
+                const query = IDBKeyRange.bound([factory, index], [factory, index + Database.GET_ORDERBOOKS_BATCH - 1]);
+                for (const orderbook of await this._db.getAllFromIndex('orderbooks', 'byFactoryIndex', query)) {
+                    try {
+                        yield orderbook;
+
+                    } finally {
+                        // eslint-disable-next-line no-unsafe-finally
+                        if (abortSignal?.aborted) throw abortSignal.reason;
+                    }
+                }
             }
+
+        } finally {
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
         }
     }
 
     async getLastFactoryIndex(factory: Address, abortSignal?: AbortSignal) {
-        const abortify = createAbortifier(abortSignal);
-        const query = IDBKeyRange.bound([factory], [factory, Infinity]);
-        const cursor = await abortify(this._db.transaction('orderbooks').store.index('byFactoryIndex').openCursor(query, 'prev'));
-        return cursor?.value.factoryIndex;
+        try {
+            const query = IDBKeyRange.bound([factory], [factory, Infinity]);
+            const cursor = await this._db.transaction('orderbooks').store.index('byFactoryIndex').openCursor(query, 'prev');
+            return cursor?.value.factoryIndex;
+
+        } finally {
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
+        }
     }
 
     async getOrderbook(address: Address, abortSignal?: AbortSignal) {
-        const abortify = createAbortifier(abortSignal);
-        const orderbook = await abortify(this._db.get('orderbooks', address));
-        if (!orderbook) throw new NotInDatabase;
-        return orderbook;
+        try {
+            const orderbook = await this._db.get('orderbooks', address);
+            if (!orderbook) throw new NotInDatabase;
+            return orderbook;
+
+        } finally {
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
+        }
     }
 
     async saveOrderbook(orderbook: OrderbookData, abortSignal?: AbortSignal) {
-        const abortify = createAbortifier(abortSignal);
-        const {
-            tracked,
-            address,
-            version,
-            tradedToken,
-            baseToken,
-            contractSize,
-            priceTick,
-            creationBlockNumber,
-            factory,
-            factoryIndex,
-        } = orderbook;
-        await abortify(this._db.put('orderbooks', {
-            tracked,
-            address,
-            version,
-            tradedToken,
-            baseToken,
-            contractSize,
-            priceTick,
-            creationBlockNumber,
-            factory,
-            factoryIndex,
-        }));
+        try {
+            const {
+                tracked,
+                address,
+                version,
+                tradedToken,
+                baseToken,
+                contractSize,
+                priceTick,
+                creationBlockNumber,
+                factory,
+                factoryIndex,
+            } = orderbook;
+            await this._db.put('orderbooks', {
+                tracked,
+                address,
+                version,
+                tradedToken,
+                baseToken,
+                contractSize,
+                priceTick,
+                creationBlockNumber,
+                factory,
+                factoryIndex,
+            });
+
+        } finally {
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
+        }
     }
 
     private async _getPriceHistoryRanges(
@@ -177,135 +243,186 @@ export class Database {
     }
 
     async getPriceHistoryRanges(orderbook: Address, fromBlock: number, toBlock: number, abortSignal?: AbortSignal) {
-        checkAbortSignal(abortSignal);
-        const tx = this._db.transaction('priceHistoryRanges', 'readonly');
-        const ranges = await this._getPriceHistoryRanges(tx, orderbook, fromBlock, toBlock);
-        checkAbortSignal(abortSignal);
-        return ranges;
+        try {
+            const tx = this._db.transaction('priceHistoryRanges', 'readonly');
+            return await this._getPriceHistoryRanges(tx, orderbook, fromBlock, toBlock);
+
+        } finally {
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
+        }
     }
 
     async addPriceHistoryRange(orderbook: Address, fromBlock: number, toBlock: number, abortSignal?: AbortSignal) {
-        const tx = this._db.transaction('priceHistoryRanges', 'readwrite');
-        const ranges = await this._getPriceHistoryRanges(tx, orderbook, fromBlock-1, toBlock+1);
-        if (ranges.length) {
-            fromBlock = Math.min(fromBlock, ranges[0].fromBlock);
-            toBlock = Math.max(toBlock, ranges[ranges.length-1].toBlock);
-            const keyRange = IDBKeyRange.bound([orderbook, fromBlock], [orderbook, toBlock]);
-            await tx.store.delete(keyRange);
+        try {
+            const tx = this._db.transaction('priceHistoryRanges', 'readwrite');
+            const ranges = await this._getPriceHistoryRanges(tx, orderbook, fromBlock-1, toBlock+1);
+            if (ranges.length) {
+                fromBlock = Math.min(fromBlock, ranges[0].fromBlock);
+                toBlock = Math.max(toBlock, ranges[ranges.length-1].toBlock);
+                const keyRange = IDBKeyRange.bound([orderbook, fromBlock], [orderbook, toBlock]);
+                await tx.store.delete(keyRange);
+            }
+            await tx.store.put({ orderbook, fromBlock, toBlock });
+            await tx.done;
+
+        } finally {
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
         }
-        await tx.store.put({ orderbook, fromBlock, toBlock });
-        await tx.done;
-        checkAbortSignal(abortSignal);
     }
 
     async getPriceHistoryTicks(orderbook: Address, fromBlock: number, toBlock: number, abortSignal?: AbortSignal) {
-        checkAbortSignal(abortSignal);
-        const range = IDBKeyRange.bound([orderbook, fromBlock, 0], [orderbook, toBlock, Infinity]);
-        const ticks = await this._db.getAll('priceHistoryTicks', range);
-        checkAbortSignal(abortSignal);
-        return ticks;
+        try {
+            const range = IDBKeyRange.bound([orderbook, fromBlock, 0], [orderbook, toBlock, Infinity]);
+            return await this._db.getAll('priceHistoryTicks', range);
+
+        } finally {
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
+        }
     }
 
     async savePriceHistoryTick(tick: PriceHistoryTickData, abortSignal?: AbortSignal) {
-        await this._db.put('priceHistoryTicks', tick);
-        checkAbortSignal(abortSignal);
+        try {
+            await this._db.put('priceHistoryTicks', tick);
+
+        } finally {
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
+        }
     }
 
     async getOrders(owner: Address, abortSignal?: AbortSignal) {
-        const range = IDBKeyRange.bound([owner, -Infinity], [owner, Infinity]);
-        const orders = await this._db.getAllFromIndex('orders', 'byOwner', range);
-        checkAbortSignal(abortSignal);
-        return orders.reverse();
+        try {
+            const range = IDBKeyRange.bound([owner, -Infinity], [owner, Infinity]);
+            const orders = await this._db.getAllFromIndex('orders', 'byOwner', range);
+            return orders.reverse();
+
+        } finally {
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
+        }
     }
 
     async getRecentOrders(owner: Address, count: number, abortSignal?: AbortSignal) {
-        const range = IDBKeyRange.bound([owner, -Infinity], [owner, Infinity]);
-        let cursor = await this._db.transaction('orders').store.index('byOwner').openCursor(range, 'prev');
-        const orders: OrderData[] = [];
-        while (cursor && count > 0) {
-            orders.push(cursor.value);
-            cursor = await cursor.continue();
-            count--;
+        try {
+            const range = IDBKeyRange.bound([owner, -Infinity], [owner, Infinity]);
+            let cursor = await this._db.transaction('orders').store.index('byOwner').openCursor(range, 'prev');
+            const orders: OrderData[] = [];
+            while (cursor && count > 0) {
+                orders.push(cursor.value);
+                cursor = await cursor.continue();
+                count--;
+            }
+            return orders;
+
+        } finally {
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
         }
-        checkAbortSignal(abortSignal);
-        return orders;
     }
 
     async getOrder(key: string, abortSignal?: AbortSignal) {
-        const order = await this._db.get('orders', key);
-        checkAbortSignal(abortSignal);
-        if (!order) throw new NotInDatabase;
-        return order;
+        try {
+            const order = await this._db.get('orders', key);
+            if (!order) throw new NotInDatabase;
+            return order;
+
+        } finally {
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
+        }
     }
 
     async getOpenOrders(owner: Address, abortSignal?: AbortSignal) {
-        const range = IDBKeyRange.bound([owner, OrderMainStatus.OPEN, -Infinity], [owner, OrderMainStatus.OPEN, Infinity]);
-        const orders = await this._db.getAllFromIndex('orders', 'byMainStatus', range);
-        checkAbortSignal(abortSignal);
-        return orders.reverse();
+        try {
+            const range = IDBKeyRange.bound([owner, OrderMainStatus.OPEN, -Infinity], [owner, OrderMainStatus.OPEN, Infinity]);
+            const orders = await this._db.getAllFromIndex('orders', 'byMainStatus', range);
+            return orders.reverse();
+
+        } finally {
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
+        }
     }
 
     async getClosedOrders(owner: Address, abortSignal?: AbortSignal) {
-        const range = IDBKeyRange.bound([owner, OrderMainStatus.CLOSED, -Infinity], [owner, OrderMainStatus.CLOSED, Infinity]);
-        const orders = await this._db.getAllFromIndex('orders', 'byMainStatus', range);
-        checkAbortSignal(abortSignal);
-        return orders.reverse();
+        try {
+            const range = IDBKeyRange.bound([owner, OrderMainStatus.CLOSED, -Infinity], [owner, OrderMainStatus.CLOSED, Infinity]);
+            const orders = await this._db.getAllFromIndex('orders', 'byMainStatus', range);
+            return orders.reverse();
+
+        } finally {
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
+        }
     }
 
     async saveOrder(order: Omit<OrderData, 'mainStatus'>, abortSignal?: AbortSignal) {
-        const {
-            key,
-            owner,
-            timestamp,
-            orderbook,
-            txHash,
-            id,
-            status,
-            type,
-            execution,
-            price,
-            totalPrice,
-            totalPriceClaimed,
-            amount,
-            filled,
-            claimed,
-            canceled,
-            error,
-            claimTxHash,
-            cancelTxHash,
-        } = order;
-        const mainStatus =
-              status.includes(OrderStatus.PENDING) ? OrderMainStatus.OPEN
-            : status.includes(OrderStatus.OPEN) ? OrderMainStatus.OPEN
-            : OrderMainStatus.CLOSED;
-        await this._db.put('orders', {
-            key,
-            owner,
-            timestamp,
-            orderbook,
-            txHash,
-            id,
-            mainStatus,
-            status,
-            type,
-            execution,
-            price,
-            totalPrice,
-            totalPriceClaimed,
-            amount,
-            filled,
-            claimed,
-            canceled,
-            error,
-            claimTxHash,
-            cancelTxHash,
-        });
-        checkAbortSignal(abortSignal);
+        try {
+            const {
+                key,
+                owner,
+                timestamp,
+                orderbook,
+                txHash,
+                id,
+                status,
+                type,
+                execution,
+                price,
+                totalPrice,
+                totalPriceClaimed,
+                amount,
+                filled,
+                claimed,
+                canceled,
+                error,
+                claimTxHash,
+                cancelTxHash,
+            } = order;
+            const mainStatus =
+                status.includes(OrderStatus.PENDING) ? OrderMainStatus.OPEN
+                : status.includes(OrderStatus.OPEN) ? OrderMainStatus.OPEN
+                : OrderMainStatus.CLOSED;
+            await this._db.put('orders', {
+                key,
+                owner,
+                timestamp,
+                orderbook,
+                txHash,
+                id,
+                mainStatus,
+                status,
+                type,
+                execution,
+                price,
+                totalPrice,
+                totalPriceClaimed,
+                amount,
+                filled,
+                claimed,
+                canceled,
+                error,
+                claimTxHash,
+                cancelTxHash,
+            });
+
+        } finally {
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
+        }
     }
 
     async deleteOrder(key: OrderData['key'], abortSignal?: AbortSignal) {
-        await this._db.delete('orders', key);
-        checkAbortSignal(abortSignal);
+        try {
+            await this._db.delete('orders', key);
+
+        } finally {
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
+        }
     }
 }
 

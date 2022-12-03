@@ -5,7 +5,7 @@ import { Database, NotInDatabase, TrackedFlag } from './Database';
 import { GenericEventListener } from './event-types';
 import { fetchOrderbookData, fetchOrderbooksData, Orderbook, OrderbookInternal } from './Orderbook';
 import { NotAnERC20Token, Token } from './Token';
-import { asyncCatchError, createAbortifier } from './utils';
+import { asyncCatchError } from './utils';
 
 export enum OrderbookDEXEventType {
     /**
@@ -217,11 +217,10 @@ export class OrderbookDEXInternal extends OrderbookDEX {
 
         } catch (error) {
             if (error instanceof NotInDatabase) {
-                const abortify = createAbortifier(abortSignal);
                 const contract = IERC20.at(address);
-                const name = await abortify(asyncCatchError(contract.name(), NotAnERC20Token));
-                const symbol = await abortify(asyncCatchError(contract.symbol(), NotAnERC20Token));
-                const decimals = await abortify(asyncCatchError(contract.decimals(), NotAnERC20Token));
+                const name = await asyncCatchError(contract.name({ abortSignal }), NotAnERC20Token);
+                const symbol = await asyncCatchError(contract.symbol({ abortSignal }), NotAnERC20Token);
+                const decimals = await asyncCatchError(contract.decimals({ abortSignal }), NotAnERC20Token);
                 await Database.instance.saveToken({ tracked: TrackedFlag.NOT_TRACKED, address, name, symbol, decimals }, abortSignal);
                 return new Token({ tracked: false, address, name, symbol, decimals, hasFaucet });
 

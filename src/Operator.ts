@@ -6,7 +6,7 @@ import { IOperatorFactory } from '@theorderbookdex/orderbook-dex-operator/dist/i
 import { getDevChainFunds } from './dev-chain';
 import { isUserRejectionError } from './ethereum';
 import { Orderbook } from './Orderbook';
-import { checkAbortSignal, createAbortifier, createSubAbortController, max, min } from './utils';
+import { createSubAbortController, max, min } from './utils';
 import { ContractEvent, decodeErrorData, MAX_UINT32, Transaction } from '@frugal-wizard/abi2ts-lib';
 import { IERC20 } from '@theorderbookdex/orderbook-dex/dist/interfaces/IERC20';
 import { IERC20WithFaucet, FaucetOnCooldown as FaucetOnCooldownContractError } from '@theorderbookdex/orderbook-dex/dist/testing/interfaces/IERC20WithFaucet';
@@ -440,10 +440,8 @@ export class OperatorInternal extends Operator {
 
     async getBalance(token: Token, abortSignal?: AbortSignal) {
         const contract = IERC20.at(token.address);
-        const wallet = await contract.balanceOf(this.walletAddress);
-        checkAbortSignal(abortSignal);
-        const operator = await contract.balanceOf(this.operatorAddress);
-        checkAbortSignal(abortSignal);
+        const wallet = await contract.balanceOf(this.walletAddress, { abortSignal });
+        const operator = await contract.balanceOf(this.operatorAddress, { abortSignal });
         return { wallet, operator };
     }
 
@@ -451,37 +449,55 @@ export class OperatorInternal extends Operator {
         const tokenContract = IERC20.at(token.address);
         const sender = this.walletAddress
         const operator = this.operatorAddress;
+
         try {
-            if (await tokenContract.balanceOf(sender) < amount) {
+            if (await tokenContract.balanceOf(sender, { abortSignal }) < amount) {
                 throw new InsufficientFunds();
             }
+
+            // we don't abort here since the tx might still execute
             await tokenContract.transfer(operator, amount);
+            this.dispatchEvent(new TokenDepositedEvent(token, amount));
+
         } catch (error) {
             if (isUserRejectionError(error)) {
                 throw new RequestRejected();
             }
             throw error;
+
+        } finally {
+            // since we called some functions without the abort signal we have to check it here
+
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
         }
-        this.dispatchEvent(new TokenDepositedEvent(token, amount));
-        checkAbortSignal(abortSignal);
     }
 
     async withdraw(token: Token, amount: bigint, abortSignal?: AbortSignal) {
         const tokenContract = IERC20.at(token.address);
         const operator = IOperatorV1.at(this.operatorAddress);
+
         try {
-            if (await tokenContract.balanceOf(operator) < amount) {
+            if (await tokenContract.balanceOf(operator, { abortSignal }) < amount) {
                 throw new InsufficientFunds();
             }
+
+            // we don't abort here since the tx might still execute
             await operator.withdrawERC20([ [ token, amount ] ]);
+            this.dispatchEvent(new TokenWithdrawnEvent(token, amount));
+
         } catch (error) {
             if (isUserRejectionError(error)) {
                 throw new RequestRejected();
             }
             throw error;
+
+        } finally {
+            // since we called some functions without the abort signal we have to check it here
+
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
         }
-        this.dispatchEvent(new TokenWithdrawnEvent(token, amount));
-        checkAbortSignal(abortSignal);
     }
 
     async faucet(token: Token, abortSignal?: AbortSignal) {
@@ -489,14 +505,14 @@ export class OperatorInternal extends Operator {
             throw new TokenHasNoFaucet();
         }
 
-        const abortify = createAbortifier(abortSignal);
-
         const tokenContract = IERC20WithFaucet.at(token.address);
 
         try {
             // call static to catch errors
-            await abortify(tokenContract.callStatic.faucet());
-            await abortify(tokenContract.faucet());
+            await tokenContract.callStatic.faucet({ abortSignal });
+
+            // we don't abort here since the tx might still execute
+            await tokenContract.faucet();
             this.dispatchEvent(new FaucetUsedEvent(token));
 
         } catch (error) {
@@ -509,6 +525,12 @@ export class OperatorInternal extends Operator {
             } else {
                 throw error;
             }
+
+        } finally {
+            // since we called some functions without the abort signal we have to check it here
+
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
         }
     }
 
@@ -543,8 +565,7 @@ export class OperatorInternal extends Operator {
     }
 
     private async trackOrderPending(order: OrderInternal, abortSignal: AbortSignal) {
-        const { events } = await Transaction.get(order.txHash);
-        checkAbortSignal(abortSignal);
+        const { events } = await Transaction.get(order.txHash, abortSignal);
 
         order = { ...order, txHash: '' };
 
@@ -598,11 +619,9 @@ export class OperatorInternal extends Operator {
         const orderbook = IOrderbookV1.at(order.orderbook.address);
 
         const updateOrder = async () => {
-            const { totalFilled } = await orderbook.pricePoint(type, price);
-            checkAbortSignal(abortSignal);
+            const { totalFilled } = await orderbook.pricePoint(type, price, { abortSignal });
 
-            const { owner, totalPlacedBeforeOrder, amount: placedAmount } = await orderbook.order(type, price, id);
-            checkAbortSignal(abortSignal);
+            const { owner, totalPlacedBeforeOrder, amount: placedAmount } = await orderbook.order(type, price, id, { abortSignal });
 
             if (!owner) {
                 order = {
@@ -650,8 +669,7 @@ export class OperatorInternal extends Operator {
     }
 
     private async trackOrderClaim(order: OrderInternal, abortSignal: AbortSignal) {
-        const { events } = await Transaction.get(order.claimTxHash);
-        checkAbortSignal(abortSignal);
+        const { events } = await Transaction.get(order.claimTxHash, abortSignal);
 
         order = { ...order, claimTxHash: '' };
 
@@ -677,8 +695,7 @@ export class OperatorInternal extends Operator {
     }
 
     private async trackOrderCancel(order: OrderInternal, abortSignal: AbortSignal) {
-        const { events } = await Transaction.get(order.cancelTxHash);
-        checkAbortSignal(abortSignal);
+        const { events } = await Transaction.get(order.cancelTxHash, abortSignal);
 
         order = { ...order, cancelTxHash: '' };
 
@@ -739,41 +756,61 @@ export class OperatorInternal extends Operator {
         }
     }
 
-    private async createOrder(txHash: string, orderbook: Orderbook, type: OrderType, execution: OrderExecutionType, price: bigint, amount: bigint) {
-        const order = updateOrderStatus({
-            key: txHash,
-            owner: this.operatorAddress,
-            orderbook,
-            txHash,
-            id: 0n,
-            timestamp: now(),
-            status: [],
-            type,
-            execution,
-            price,
-            totalPrice: 0n,
-            totalPriceClaimed: 0n,
-            amount,
-            filled: 0n,
-            claimed: 0n,
-            canceled: 0n,
-            error: '',
-            claimTxHash: '',
-            cancelTxHash: '',
-        });
-        await Database.instance.saveOrder({ ...order, orderbook: order.orderbook.address });
-        this.dispatchEvent(new OrderCreatedEvent(order));
-        this.trackOrder(order);
+    private async createOrder(txHash: string, orderbook: Orderbook, type: OrderType, execution: OrderExecutionType, price: bigint, amount: bigint, abortSignal?: AbortSignal) {
+        try {
+            const order = updateOrderStatus({
+                key: txHash,
+                owner: this.operatorAddress,
+                orderbook,
+                txHash,
+                id: 0n,
+                timestamp: now(),
+                status: [],
+                type,
+                execution,
+                price,
+                totalPrice: 0n,
+                totalPriceClaimed: 0n,
+                amount,
+                filled: 0n,
+                claimed: 0n,
+                canceled: 0n,
+                error: '',
+                claimTxHash: '',
+                cancelTxHash: '',
+            });
+
+            // we don't abort here because the order might get saved anyway
+            await Database.instance.saveOrder({ ...order, orderbook: order.orderbook.address });
+            this.dispatchEvent(new OrderCreatedEvent(order));
+            this.trackOrder(order);
+
+        } finally {
+            // we need to check the abort signal before continuing
+
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
+        }
     }
 
     private async saveOrder(order: OrderInternal, abortSignal?: AbortSignal) {
-        order = updateOrderStatus(order);
-        await Database.instance.saveOrder({ ...order, orderbook: order.orderbook.address }, abortSignal);
-        this.dispatchEvent(new OrderUpdatedEvent(order));
+        try {
+            order = updateOrderStatus(order);
+
+            // we don't abort here because the order might get saved anyway
+            await Database.instance.saveOrder({ ...order, orderbook: order.orderbook.address });
+            this.dispatchEvent(new OrderUpdatedEvent(order));
+
+        } finally {
+            // we need to check the abort signal before continuing
+
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
+        }
     }
 
-    private async refreshOrder(order: OrderInternal, abortSignal?: AbortSignal) {
-        const refreshedOrder = await Database.instance.getOrder(order.key, abortSignal);
+    private async refreshOrder(order: OrderInternal) {
+        const refreshedOrder = await Database.instance.getOrder(order.key);
         return {
             ...refreshedOrder,
             orderbook: await OrderbookDEX.instance.getOrderbook(refreshedOrder.orderbook),
@@ -785,22 +822,27 @@ export class OperatorInternal extends Operator {
         const baseToken = IERC20.at(orderbook.baseToken.address);
         // TODO allow user to configure maxPricePoints
         const maxPricePoints = 255;
-        // TODO estimate gas for transaction
+
         try {
-            if (await baseToken.balanceOf(operator) < maxAmount * maxPrice) {
+            // TODO estimate gas for transaction
+
+            if (await baseToken.balanceOf(operator, { abortSignal }) < maxAmount * maxPrice) {
                 throw new InsufficientFunds();
             }
+
             // TODO check for more errors before sending transaction
+
+            // we don't abort here since the tx might still execute
             const hash = await operator.sendTransaction.buyAtMarketV1(orderbook.address, maxAmount, maxPrice, maxPricePoints);
-            await this.createOrder(hash, orderbook, OrderType.BUY, OrderExecutionType.MARKET, maxPrice, maxAmount);
+            // the abort signal is checked here
+            await this.createOrder(hash, orderbook, OrderType.BUY, OrderExecutionType.MARKET, maxPrice, maxAmount, abortSignal);
+
         } catch (error) {
-            checkAbortSignal(abortSignal);
             if (isUserRejectionError(error)) {
                 throw new RequestRejected();
             }
             throw error;
         }
-        checkAbortSignal(abortSignal);
     }
 
     async sellAtMarket(orderbook: Orderbook, maxAmount: bigint, minPrice: bigint, abortSignal?: AbortSignal) {
@@ -808,22 +850,27 @@ export class OperatorInternal extends Operator {
         const tradedToken = IERC20.at(orderbook.tradedToken.address);
         // TODO allow user to configure maxPricePoints
         const maxPricePoints = 255;
-        // TODO estimate gas for transaction
+
         try {
-            if (await tradedToken.balanceOf(operator) < maxAmount * orderbook.contractSize) {
+            // TODO estimate gas for transaction
+
+            if (await tradedToken.balanceOf(operator, { abortSignal }) < maxAmount * orderbook.contractSize) {
                 throw new InsufficientFunds();
             }
+
             // TODO check for more errors before sending transaction
+
+            // we don't abort here since the tx might still execute
             const hash = await operator.sendTransaction.sellAtMarketV1(orderbook.address, maxAmount, minPrice, maxPricePoints);
-            await this.createOrder(hash, orderbook, OrderType.SELL, OrderExecutionType.MARKET, minPrice, maxAmount);
+            // the abort signal is checked here
+            await this.createOrder(hash, orderbook, OrderType.SELL, OrderExecutionType.MARKET, minPrice, maxAmount, abortSignal);
+
         } catch (error) {
-            checkAbortSignal(abortSignal);
             if (isUserRejectionError(error)) {
                 throw new RequestRejected();
             }
             throw error;
         }
-        checkAbortSignal(abortSignal);
     }
 
     async placeBuyOrder(orderbook: Orderbook, maxAmount: bigint, price: bigint, abortSignal?: AbortSignal) {
@@ -831,22 +878,27 @@ export class OperatorInternal extends Operator {
         const baseToken = IERC20.at(orderbook.baseToken.address);
         // TODO allow user to configure maxPricePoints
         const maxPricePoints = 255;
-        // TODO estimate gas for transaction
+
         try {
-            if (await baseToken.balanceOf(operator) < maxAmount * price) {
+            // TODO estimate gas for transaction
+
+            if (await baseToken.balanceOf(operator, { abortSignal }) < maxAmount * price) {
                 throw new InsufficientFunds();
             }
+
             // TODO check for more errors before sending transaction
+
+            // we don't abort here since the tx might still execute
             const hash = await operator.sendTransaction.placeBuyOrderV1(orderbook.address, maxAmount, price, maxPricePoints);
-            await this.createOrder(hash, orderbook, OrderType.BUY, OrderExecutionType.LIMIT, price, maxAmount);
+            // the abort signal is checked here
+            await this.createOrder(hash, orderbook, OrderType.BUY, OrderExecutionType.LIMIT, price, maxAmount, abortSignal);
+
         } catch (error) {
-            checkAbortSignal(abortSignal);
             if (isUserRejectionError(error)) {
                 throw new RequestRejected();
             }
             throw error;
         }
-        checkAbortSignal(abortSignal);
     }
 
     async placeSellOrder(orderbook: Orderbook, maxAmount: bigint, price: bigint, abortSignal?: AbortSignal) {
@@ -854,85 +906,104 @@ export class OperatorInternal extends Operator {
         const tradedToken = IERC20.at(orderbook.tradedToken.address);
         // TODO allow user to configure maxPricePoints
         const maxPricePoints = 255;
-        // TODO estimate gas for transaction
+
         try {
-            if (await tradedToken.balanceOf(operator) < maxAmount * orderbook.contractSize) {
+            // TODO estimate gas for transaction
+
+            if (await tradedToken.balanceOf(operator, { abortSignal }) < maxAmount * orderbook.contractSize) {
                 throw new InsufficientFunds();
             }
+
             // TODO check for more errors before sending transaction
+
+            // we don't abort here since the tx might still execute
             const hash = await operator.sendTransaction.placeSellOrderV1(orderbook.address, maxAmount, price, maxPricePoints);
-            await this.createOrder(hash, orderbook, OrderType.SELL, OrderExecutionType.LIMIT, price, maxAmount);
+            // the abort signal is checked here
+            await this.createOrder(hash, orderbook, OrderType.SELL, OrderExecutionType.LIMIT, price, maxAmount, abortSignal);
+
         } catch (error) {
-            checkAbortSignal(abortSignal);
             if (isUserRejectionError(error)) {
                 throw new RequestRejected();
             }
             throw error;
         }
-        checkAbortSignal(abortSignal);
     }
 
     async claimOrder(order: OrderInternal, abortSignal?: AbortSignal) {
         const operator = IOperatorV1.at(this.operatorAddress);
         const maxAmount = MAX_UINT32;
+
         try {
             const { orderbook, price, id } = order;
             const type = encodeOrderType(order.type);
+            // we don't abort here since the tx might still execute
             const claimTxHash = await operator.sendTransaction.claimOrderV1(orderbook, type, price, id, maxAmount);
             order = await this.refreshOrder(order);
             order = { ...order, claimTxHash };
-            await this.saveOrder(order);
+            // the abort signal is checked here
+            await this.saveOrder(order, abortSignal);
+
         } catch (error) {
-            checkAbortSignal(abortSignal);
             if (isUserRejectionError(error)) {
                 throw new RequestRejected();
             }
             throw error;
         }
-        checkAbortSignal(abortSignal);
     }
 
     async cancelOrder(order: OrderInternal, abortSignal?: AbortSignal) {
         const operator = IOperatorV1.at(this.operatorAddress);
         // TODO allow user to configure maxLastOrderId
         const maxLastOrderId = MAX_UINT32;
+
         try {
             const { orderbook, price, id } = order;
             const type = encodeOrderType(order.type);
+
+            // we don't abort here since the tx might still execute
             const cancelTxHash = await operator.sendTransaction.cancelOrderV1(orderbook, type, price, id, maxLastOrderId);
             order = await this.refreshOrder(order);
             order = { ...order, cancelTxHash };
-            await this.saveOrder(order);
+            // the abort signal is checked here
+            await this.saveOrder(order, abortSignal);
+
         } catch (error) {
-            checkAbortSignal(abortSignal);
             if (isUserRejectionError(error)) {
                 throw new RequestRejected();
             }
             throw error;
         }
-        checkAbortSignal(abortSignal);
     }
 
     async dismissOrder(order: OrderInternal, abortSignal?: AbortSignal): Promise<void> {
         if (!order.status.includes(OrderStatus.CLOSED)) {
             throw new CannotDismissOrder();
         }
-        await Database.instance.deleteOrder(order.key, abortSignal);
-        this.dispatchEvent(new OrderRemovedEvent(order));
+
+        try {
+            // we don't abort here since the order might still get deleted
+            await Database.instance.deleteOrder(order.key);
+            this.dispatchEvent(new OrderRemovedEvent(order));
+
+        } finally {
+            // we need to check the abort signal before continuing
+
+            // eslint-disable-next-line no-unsafe-finally
+            if (abortSignal?.aborted) throw abortSignal.reason;
+        }
     }
 
     async createOrderbook(properties: OrderbookProperties, abortSignal?: AbortSignal): Promise<Orderbook> {
         const { tradedToken, baseToken, contractSize, priceTick } = properties;
-        const abortify = createAbortifier(abortSignal);
 
         const factory = IOrderbookFactoryV1.at(OrderbookDEXInternal.instance._config.orderbookFactoryV1);
 
         try {
             // call static to catch errors
-            await abortify(factory.callStatic.createOrderbook(tradedToken, baseToken, contractSize, priceTick));
-            const { events } = await abortify(factory.createOrderbook(tradedToken, baseToken, contractSize, priceTick));
+            await factory.callStatic.createOrderbook(tradedToken, baseToken, contractSize, priceTick, { abortSignal });
+            const { events } = await factory.createOrderbook(tradedToken, baseToken, contractSize, priceTick, { abortSignal });
             const [ { orderbook } ] = events.filter(event => event instanceof OrderbookCreated) as OrderbookCreated[];
-            return await abortify(OrderbookDEX.instance.getOrderbook(orderbook as Address, abortSignal));
+            return await OrderbookDEX.instance.getOrderbook(orderbook as Address, abortSignal);
 
         } catch (error) {
             if (isUserRejectionError(error)) {

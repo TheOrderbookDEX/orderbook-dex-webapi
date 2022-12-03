@@ -1,5 +1,4 @@
 import { Ethereum, getEthereum } from './ethereum';
-import { checkAbortSignal } from './utils';
 import { Database } from './Database';
 import { ChainEvents } from './ChainEvents';
 import { getBlockTimestamp } from '@frugal-wizard/abi2ts-lib';
@@ -104,12 +103,10 @@ export class ChainInternal extends Chain {
 }
 
 export async function fetchBlockTimestamp(blockNumber: number, abortSignal?: AbortSignal) {
-    checkAbortSignal(abortSignal);
     try {
         return await Database.instance.getBlockTimestamp(blockNumber, abortSignal);
     } catch {
-        const timestamp = await getBlockTimestamp(blockNumber);
-        checkAbortSignal(abortSignal);
+        const timestamp = await getBlockTimestamp(blockNumber, abortSignal);
         return await Database.instance.saveBlockTimestamp(blockNumber, timestamp, abortSignal);
     }
 }

@@ -4,7 +4,7 @@ import { Address, ZERO_ADDRESS } from './Address';
 import { Database, OrderbookData, TrackedFlag } from './Database';
 import { OrderbookDEXInternal } from './OrderbookDEX';
 import { Token } from './Token';
-import { asyncCatchError, asyncFirst, checkAbortSignal } from './utils';
+import { asyncCatchError, asyncFirst } from './utils';
 import { PriceHistory, PriceHistoryInternal, TimeFrame } from './PriceHistory';
 import { PricePoints, PricePointsInternal } from './PricePoints';
 import { PriceTicker, PriceTickerInternal } from './PriceTicker';
@@ -138,25 +138,23 @@ interface OrderbookProperties {
 const FETCH_ORDERBOOKS_BATCH = 10n;
 
 export async function* fetchOrderbooksData(abortSignal?: AbortSignal) {
-    checkAbortSignal(abortSignal);
     const { orderbookFactoryV1 } = OrderbookDEXInternal.instance._config;
     let index = 0;
-    for await (const orderbook of Database.instance.getOrderbooks(orderbookFactoryV1)) {
+    for await (const orderbook of Database.instance.getOrderbooks(orderbookFactoryV1, abortSignal)) {
         index = orderbook.factoryIndex as number + 1;
         yield orderbook;
     }
     const orderbookFactory = IOrderbookFactoryV1.at(orderbookFactoryV1);
-    const totalCreated = Number(await orderbookFactory.totalCreated());
-    checkAbortSignal(abortSignal);
+    const totalCreated = Number(await orderbookFactory.totalCreated({ abortSignal }));
     while (index < totalCreated) {
-        for (const address of await orderbookFactory.orderbooks(BigInt(index), FETCH_ORDERBOOKS_BATCH)) {
+        for (const address of await orderbookFactory.orderbooks(BigInt(index), FETCH_ORDERBOOKS_BATCH, { abortSignal })) {
             if (address == ZERO_ADDRESS) break;
             const orderbook: OrderbookData = {
                 ...await fetchOrderbookData(address as Address, abortSignal),
                 factory: orderbookFactoryV1,
                 factoryIndex: index,
             };
-            await Database.instance.saveOrderbook(orderbook);
+            await Database.instance.saveOrderbook(orderbook, abortSignal);
             yield orderbook;
             index++;
         }
@@ -164,18 +162,15 @@ export async function* fetchOrderbooksData(abortSignal?: AbortSignal) {
 }
 
 export async function fetchOrderbookData(address: Address, abortSignal?: AbortSignal): Promise<OrderbookData> {
-    checkAbortSignal(abortSignal);
     try {
         return await Database.instance.getOrderbook(address, abortSignal);
     } catch {
         const contract = IOrderbook.at(address);
-        const version = await asyncCatchError(contract.version(), NotAnOrderbook);
-        checkAbortSignal(abortSignal);
+        const version = await asyncCatchError(contract.version({ abortSignal }), NotAnOrderbook);
         switch (version) {
             case Orderbook.V1: {
                 const orderbookFactory = IOrderbookFactoryV1.at(OrderbookDEXInternal.instance._config.orderbookFactoryV1);
-                const event = await asyncFirst(OrderbookCreated.get({ address: orderbookFactory.address, orderbook: address }));
-                checkAbortSignal(abortSignal);
+                const event = await asyncFirst(OrderbookCreated.get({ address: orderbookFactory.address, orderbook: address }, abortSignal));
                 if (!event) throw new NotAnOrderbook();
                 const { tradedToken, baseToken, contractSize, priceTick, blockNumber: creationBlockNumber } = event;
                 const orderbook = {

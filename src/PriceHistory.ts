@@ -2,7 +2,7 @@ import { Filled } from '@theorderbookdex/orderbook-dex-v1/dist/interfaces/IOrder
 import { ChainInternal, fetchBlockTimestamp } from './Chain';
 import { GenericEventListener } from './event-types';
 import { EventTargetX } from './EventTargetX';
-import { checkAbortSignal, isAbortReason } from './utils';
+import { isAbortReason } from './utils';
 import { fetchOrderbookData } from './Orderbook';
 import { Database } from './Database';
 import { ContractEvent, getBlockNumber } from '@frugal-wizard/abi2ts-lib';
@@ -193,8 +193,8 @@ export interface PriceHistoryTickInternal {
     readonly price: bigint;
 }
 
-let filledEventFetcher = function(address: string, fromBlock: number, toBlock: number) {
-    return Filled.get({ address, fromBlock, toBlock });
+let filledEventFetcher = function(address: string, fromBlock: number, toBlock: number, abortSignal?: AbortSignal) {
+    return Filled.get({ address, fromBlock, toBlock }, abortSignal);
 }
 
 export async function captureFilledEventFetched(callback: () => Promise<void>) {
@@ -210,8 +210,7 @@ export async function captureFilledEventFetched(callback: () => Promise<void>) {
 }
 
 async function addPriceHistoryTicksToDatabase(orderbook: Address, fromBlock: number, toBlock: number, abortSignal?: AbortSignal) {
-    checkAbortSignal(abortSignal);
-    for await (const { price, blockNumber, logIndex } of filledEventFetcher(orderbook, fromBlock, toBlock)) {
+    for await (const { price, blockNumber, logIndex } of filledEventFetcher(orderbook, fromBlock, toBlock, abortSignal)) {
         const timestamp = await fetchBlockTimestamp(blockNumber, abortSignal);
         await Database.instance.savePriceHistoryTick({ orderbook, blockNumber, logIndex, price, timestamp }, abortSignal);
     }
@@ -219,7 +218,6 @@ async function addPriceHistoryTicksToDatabase(orderbook: Address, fromBlock: num
 }
 
 async function addMissingPriceHistoryTicksToDatabase(orderbook: Address, fromBlock: number, toBlock: number, abortSignal?: AbortSignal) {
-    checkAbortSignal(abortSignal);
     for (const range of await Database.instance.getPriceHistoryRanges(orderbook, fromBlock, toBlock, abortSignal)) {
         if (fromBlock < range.fromBlock) {
             await addPriceHistoryTicksToDatabase(orderbook, fromBlock, range.fromBlock - 1, abortSignal);
@@ -246,7 +244,6 @@ export function listenToPriceHistoryTicks(orderbook: Address, abortSignal: Abort
             lastUpdate = (async () => {
                 try {
                     await prevUpdate;
-                    checkAbortSignal(abortSignal);
                     if (blockNumber > fromBlock) {
                         await Database.instance.addPriceHistoryRange(orderbook, fromBlock, blockNumber - 1, abortSignal);
                         fromBlock = blockNumber;

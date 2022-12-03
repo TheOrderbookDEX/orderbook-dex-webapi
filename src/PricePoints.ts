@@ -7,7 +7,7 @@ import { GenericEventListener } from './event-types';
 import { EventTargetX } from './EventTargetX';
 import { OrderType } from './Order';
 import { OrderbookDEXInternal } from './OrderbookDEX';
-import { checkAbortSignal, createAbortifier, isAbortReason } from './utils';
+import { isAbortReason } from './utils';
 
 export enum PricePointsEventType {
     /**
@@ -64,9 +64,7 @@ const SELL = 0;
 
 export class PricePointsInternal extends PricePoints {
     static async create(address: Address, limit: number, abortSignal?: AbortSignal) {
-        const abortify = createAbortifier(abortSignal);
-
-        const blockTag = await abortify(getBlockNumber());
+        const blockTag = await getBlockNumber(abortSignal);
 
         const { sell, buy } = await this.fetch(address, blockTag, abortSignal);
 
@@ -76,8 +74,6 @@ export class PricePointsInternal extends PricePoints {
     private static readonly FETCH_BATCH = 10;
 
     private static async fetch(address: Address, blockTag: number, abortSignal?: AbortSignal) {
-        const abortify = createAbortifier(abortSignal);
-
         const operatorV1 = IOperatorV1.at(OrderbookDEXInternal.instance._config.operatorV1);
 
         let sellDone = false;
@@ -90,14 +86,14 @@ export class PricePointsInternal extends PricePoints {
         let prevBuyPrice = 0n
 
         while (!sellDone || !buyDone) {
-            const result = await abortify(operatorV1.pricePointsV1(
+            const result = await operatorV1.pricePointsV1(
                 address,
                 prevSellPrice,
                 sellDone ? 0 : this.FETCH_BATCH,
                 prevBuyPrice,
                 buyDone ? 0 : this.FETCH_BATCH,
-                { blockTag }
-            ));
+                { blockTag, abortSignal }
+            );
 
             sell.push(...result.sell.map(([ price, available ]) => ({ price, available })));
 
@@ -151,17 +147,16 @@ export class PricePointsInternal extends PricePoints {
         const fromBlock = this._sinceBlock + 1;
         const toBlock = ChainEvents.instance.latestBlockNumber;
         const feed = ChainEvents.instance.feed(address, abortSignal);
-        const backlog = ContractEvent.get({ address, fromBlock, toBlock });
+        const backlog = ContractEvent.get({ address, fromBlock, toBlock }, abortSignal);
 
         void (async () => {
             try {
                 for await (const event of backlog) {
-                    checkAbortSignal(abortSignal); // ContractEvent.get does not use abort signal
-                    await this._update(event);
+                    this._update(event);
                 }
 
                 for await (const event of feed) {
-                    await this._update(event);
+                    this._update(event);
                 }
 
             } catch (error) {
