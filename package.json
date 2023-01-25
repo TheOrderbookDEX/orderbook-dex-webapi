@@ -13,12 +13,13 @@
     "typecheck": "tsc"
   },
   "dependencies": {
-    "@frugal-wizard/abi2ts-lib": "^0.6.2",
-    "@frugal-wizard/addressbook": "1.4.0",
-    "@theorderbookdex/orderbook-dex": "1.0.0-rc.10",
-    "@theorderbookdex/orderbook-dex-operator": "1.0.0-rc.12",
-    "@theorderbookdex/orderbook-dex-v1": "1.0.0-rc.11",
-    "@theorderbookdex/orderbook-dex-v1-operator": "1.0.0-rc.5",
+    "@frugal-wizard/abi2ts-lib": "^0.7.0",
+    "@frugal-wizard/addressbook": "1.5.0",
+    "@theorderbookdex/orderbook-dex": "1.0.0-rc.13",
+    "@theorderbookdex/orderbook-dex-operator": "1.0.0-rc.14",
+    "@theorderbookdex/orderbook-dex-team-treasury": "^1.0.0-rc.1",
+    "@theorderbookdex/orderbook-dex-v1": "1.0.0-rc.14",
+    "@theorderbookdex/orderbook-dex-v1-operator": "1.0.0-rc.6",
     "idb": "^7.1.1"
   },
   "devDependencies": {

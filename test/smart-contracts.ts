@@ -8,6 +8,7 @@ import { EthereumProvider } from 'ganache';
 import { OperatorV1 } from '@theorderbookdex/orderbook-dex-v1-operator/dist/OperatorV1';
 import { Address, ZERO_ADDRESS } from '../src';
 import { ERC20WithFaucet } from '@theorderbookdex/orderbook-dex/dist/testing/ERC20WithFaucet';
+import { OrderbookDEXTeamTreasury } from '@theorderbookdex/orderbook-dex-team-treasury/dist/OrderbookDEXTeamTreasury';
 
 interface Global {
     ethereum?: EthereumProvider;
@@ -21,6 +22,7 @@ export type TokenSymbol = TradedTokenSymbol | BaseTokenSymbol;
 export type OrderbookPair = `${TradedTokenSymbol}/${BaseTokenSymbol}`;
 
 export interface TestContracts {
+    treasury: Address;
     addressBook: Address;
     operatorFactory: Address;
     operatorV1: Address;
@@ -30,6 +32,7 @@ export interface TestContracts {
 }
 
 export const testContracts: TestContracts = {
+    treasury:         ZERO_ADDRESS,
     addressBook:      ZERO_ADDRESS,
     operatorFactory:  ZERO_ADDRESS,
     operatorV1:       ZERO_ADDRESS,
@@ -55,10 +58,11 @@ export async function setUpSmartContracts() {
     const signer = await createSigner('0x0000000000000000000000000000000000000000000000000000000000000001');
     await global.ethereum?.send('evm_setAccountBalance', [ signer.address, hexstring(1000000000000000000000n) ]);
 
+    testContracts.treasury         = (await signer.sendTransaction(await OrderbookDEXTeamTreasury.populateTransaction.deploy([ signer.address ], 0n, 0n))).contractAddress as Address;
     testContracts.addressBook      = (await signer.sendTransaction(await AddressBook.populateTransaction.deploy())).contractAddress as Address;
     testContracts.operatorFactory  = (await signer.sendTransaction(await OperatorFactory.populateTransaction.deploy(signer.address, testContracts.addressBook))).contractAddress as Address;
     testContracts.operatorV1       = (await signer.sendTransaction(await OperatorV1.populateTransaction.deploy())).contractAddress as Address;
-    testContracts.orderbookFactory = (await signer.sendTransaction(await OrderbookFactoryV1.populateTransaction.deploy(testContracts.addressBook))).contractAddress as Address;
+    testContracts.orderbookFactory = (await signer.sendTransaction(await OrderbookFactoryV1.populateTransaction.deploy(testContracts.treasury, testContracts.addressBook))).contractAddress as Address;
 
     testContracts.tokens.WBTC = (await signer.sendTransaction(await ERC20WithFaucet.populateTransaction.deploy('Wrapped BTC',   'WBTC', 18,    1000000000000000000000n, ONE_DAY))).contractAddress as Address;
     testContracts.tokens.WETH = (await signer.sendTransaction(await ERC20WithFaucet.populateTransaction.deploy('Wrapped Ether', 'WETH', 18,   10000000000000000000000n, ONE_DAY))).contractAddress as Address;
