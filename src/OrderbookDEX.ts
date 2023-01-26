@@ -379,15 +379,15 @@ orderbookDEXConfigs[5] = {
 };
 
 export const devnetConfig = orderbookDEXConfigs[1337] = {
-    operatorFactory:    '0x2946259E0334f33A064106302415aD3391BeD384' as Address,
-    operatorV1:         '0xDe09E74d4888Bc4e65F589e8c13Bce9F71DdF4c7' as Address,
-    orderbookFactoryV1: '0x51a240271AB8AB9f9a21C82d9a85396b704E164d' as Address,
+    operatorFactory:    '0xDe09E74d4888Bc4e65F589e8c13Bce9F71DdF4c7' as Address,
+    operatorV1:         '0x51a240271AB8AB9f9a21C82d9a85396b704E164d' as Address,
+    orderbookFactoryV1: '0xB9816fC57977D5A786E654c7CF76767be63b966e' as Address,
     tokens: [
-        '0xB9816fC57977D5A786E654c7CF76767be63b966e' as Address,
         '0x6D411e0A54382eD43F02410Ce1c7a7c122afA6E1' as Address,
         '0x5CF7F96627F3C9903763d128A1cc5D97556A6b99' as Address,
         '0xA3183498b579bd228aa2B62101C40CC1da978F24' as Address,
         '0x63f58053c9499E1104a6f6c6d2581d6D83067EEB' as Address,
+        '0x66a15edcC3b50a663e72F1457FFd49b9AE284dDc' as Address,
     ],
     tokensWithFaucet: [
         '0xB9816fC57977D5A786E654c7CF76767be63b966e' as Address,
@@ -395,11 +395,12 @@ export const devnetConfig = orderbookDEXConfigs[1337] = {
         '0x5CF7F96627F3C9903763d128A1cc5D97556A6b99' as Address,
         '0xA3183498b579bd228aa2B62101C40CC1da978F24' as Address,
         '0x63f58053c9499E1104a6f6c6d2581d6D83067EEB' as Address,
+        '0x66a15edcC3b50a663e72F1457FFd49b9AE284dDc' as Address,
     ],
     orderbooks: [
-        '0x3E920B0890189806A99451699e4e531E81035BA6' as Address,
-        '0x119F7448b228415C974f5814462Ec5a87837678f' as Address,
-        '0xB880b3FB12a48815fD79E30394a8F336159d3188' as Address,
-        '0xD86519C020EfC929eb2D0B967499267f287493c7' as Address,
+        '0xEbF7a4c0856859eE173FAc8Cc7eb0488950538fb' as Address,
+        '0xE2873261f82fdC86FB9e45c277381d1314EF167C' as Address,
+        '0x64F18F65dB29D1eF902Ec0D1671bFd6dA3285C38' as Address,
+        '0x825F774215B9AadEDF23B48F25De5384973cd7da' as Address,
     ],
 };
