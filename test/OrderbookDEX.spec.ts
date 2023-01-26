@@ -1,5 +1,6 @@
 import { IOrderbookV1 } from '@theorderbookdex/orderbook-dex-v1/dist/interfaces/IOrderbookV1';
 import { IERC20 } from '@theorderbookdex/orderbook-dex/dist/interfaces/IERC20';
+import { IOrderbookDEXTeamTreasury } from '@theorderbookdex/orderbook-dex/dist/interfaces/IOrderbookDEXTeamTreasury';
 import { use, expect } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import { Orderbook, OrderbookDEX, OrderbookDEXNotConnected } from '../src';
@@ -119,6 +120,8 @@ describe('OrderbookDEX', function() {
                         .to.be.equal(await contract.contractSize());
                     expect(orderbook.priceTick)
                         .to.be.equal(await contract.priceTick());
+                    expect(orderbook.fee)
+                        .to.be.equal(await IOrderbookDEXTeamTreasury.at(testContracts.treasury).fee(orderbook.version));
                 }
             });
         });

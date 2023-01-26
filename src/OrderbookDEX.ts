@@ -3,7 +3,7 @@ import { Address } from './Address';
 import { Chain } from './Chain';
 import { Database, NotInDatabase, TrackedFlag } from './Database';
 import { GenericEventListener } from './event-types';
-import { fetchOrderbookData, fetchOrderbooksData, Orderbook, OrderbookInternal } from './Orderbook';
+import { fetchFee, fetchOrderbookData, fetchOrderbooksData, Orderbook, OrderbookInternal } from './Orderbook';
 import { NotAnERC20Token, Token } from './Token';
 import { asyncCatchError } from './utils';
 
@@ -258,7 +258,8 @@ export class OrderbookDEXInternal extends OrderbookDEX {
             if (!tradedToken.tracked) continue;
             const baseToken = await this.getToken(orderbook.baseToken, abortSignal);
             if (!tradedToken.tracked) continue;
-            yield new OrderbookInternal({ ...orderbook, tracked, tradedToken, baseToken });
+            const fee = await fetchFee(orderbook.version, abortSignal);
+            yield new OrderbookInternal({ ...orderbook, tracked, tradedToken, baseToken, fee });
         }
     }
 
@@ -267,7 +268,8 @@ export class OrderbookDEXInternal extends OrderbookDEX {
         const tracked = orderbook.tracked == TrackedFlag.TRACKED;
         const tradedToken = await this.getToken(orderbook.tradedToken, abortSignal);
         const baseToken = await this.getToken(orderbook.baseToken, abortSignal);
-        return new OrderbookInternal({ ...orderbook, tracked, tradedToken, baseToken });
+        const fee = await fetchFee(orderbook.version, abortSignal);
+        return new OrderbookInternal({ ...orderbook, tracked, tradedToken, baseToken, fee });
     }
 
     async trackOrderbook(orderbook: OrderbookInternal, abortSignal?: AbortSignal): Promise<void> {
@@ -342,6 +344,7 @@ export class ChainNotSupported extends Error {
 }
 
 interface OrderbookDEXConfig {
+    readonly treasury: Address;
     readonly operatorFactory: Address;
     readonly operatorV1: Address;
     readonly orderbookFactoryV1: Address;
@@ -353,6 +356,7 @@ interface OrderbookDEXConfig {
 export const orderbookDEXConfigs: { [chainId: number]: OrderbookDEXConfig | undefined } = {};
 
 orderbookDEXConfigs[5] = {
+    treasury:           '0x0000000000000000000000000000000000000000' as Address,
     operatorFactory:    '0x8D6d10630a8Cf88519a9C38AA4F486492Bee62D4' as Address,
     operatorV1:         '0x7baB64F1c9339CCd275209a7ad02cCb9099AF79f' as Address,
     orderbookFactoryV1: '0x4c05020310E4ffA64620Fd2D419227d4cd8824ac' as Address,
@@ -379,6 +383,7 @@ orderbookDEXConfigs[5] = {
 };
 
 export const devnetConfig = orderbookDEXConfigs[1337] = {
+    treasury:           '0xF2E246BB76DF876Cef8b38ae84130F4F55De395b' as Address,
     operatorFactory:    '0xDe09E74d4888Bc4e65F589e8c13Bce9F71DdF4c7' as Address,
     operatorV1:         '0x51a240271AB8AB9f9a21C82d9a85396b704E164d' as Address,
     orderbookFactoryV1: '0xB9816fC57977D5A786E654c7CF76767be63b966e' as Address,
@@ -390,7 +395,6 @@ export const devnetConfig = orderbookDEXConfigs[1337] = {
         '0x66a15edcC3b50a663e72F1457FFd49b9AE284dDc' as Address,
     ],
     tokensWithFaucet: [
-        '0xB9816fC57977D5A786E654c7CF76767be63b966e' as Address,
         '0x6D411e0A54382eD43F02410Ce1c7a7c122afA6E1' as Address,
         '0x5CF7F96627F3C9903763d128A1cc5D97556A6b99' as Address,
         '0xA3183498b579bd228aa2B62101C40CC1da978F24' as Address,

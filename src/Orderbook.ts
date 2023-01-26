@@ -1,3 +1,4 @@
+import { IOrderbookDEXTeamTreasury } from '@theorderbookdex/orderbook-dex/dist/interfaces/IOrderbookDEXTeamTreasury';
 import { IOrderbookFactoryV1, OrderbookCreated } from '@theorderbookdex/orderbook-dex-v1/dist/interfaces/IOrderbookFactoryV1';
 import { IOrderbook } from '@theorderbookdex/orderbook-dex/dist/interfaces/IOrderbook';
 import { Address, ZERO_ADDRESS } from './Address';
@@ -61,6 +62,11 @@ export abstract class Orderbook {
     abstract get creationBlockNumber(): number;
 
     /**
+     * The fee applied in this orderbook.
+     */
+    abstract get fee(): bigint;
+
+    /**
      * Get the price points.
      *
      * @param limit The amount of price points to show at most for each list.
@@ -98,6 +104,7 @@ export class OrderbookInternal extends Orderbook {
     public readonly contractSize: bigint;
     public readonly priceTick: bigint;
     public readonly creationBlockNumber: number;
+    public readonly fee: bigint;
 
     async getPricePoints(limit: number, abortSignal?: AbortSignal) {
         return await PricePointsInternal.create(this.address, limit, abortSignal);
@@ -121,6 +128,7 @@ export class OrderbookInternal extends Orderbook {
         this.contractSize        = properties.contractSize;
         this.priceTick           = properties.priceTick;
         this.creationBlockNumber = properties.creationBlockNumber;
+        this.fee                 = properties.fee;
     }
 }
 
@@ -133,6 +141,27 @@ interface OrderbookProperties {
     readonly contractSize: bigint;
     readonly priceTick: bigint;
     readonly creationBlockNumber: number;
+    readonly fee: bigint;
+}
+
+// TODO listen to fee updates and store current fee in database
+
+const feeCache = new Map<bigint, bigint>();
+
+export async function fetchFee(version: bigint, abortSignal?: AbortSignal): Promise<bigint> {
+    try {
+        const cachedFee = feeCache.get(version);
+        if (cachedFee !== undefined) return cachedFee;
+
+        const { treasury } = OrderbookDEXInternal.instance._config;
+        const fee = await IOrderbookDEXTeamTreasury.at(treasury).fee(version);
+        feeCache.set(version, fee);
+        return fee;
+
+    } finally {
+        // eslint-disable-next-line no-unsafe-finally
+        if (abortSignal?.aborted) throw abortSignal.reason;
+    }
 }
 
 const FETCH_ORDERBOOKS_BATCH = 10n;
