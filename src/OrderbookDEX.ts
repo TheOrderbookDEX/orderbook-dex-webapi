@@ -1,3 +1,4 @@
+import { formatValue } from '@frugal-wizard/abi2ts-lib';
 import { IERC20 } from '@theorderbookdex/orderbook-dex/dist/interfaces/IERC20';
 import { Address } from './Address';
 import { Chain } from './Chain';
@@ -121,6 +122,27 @@ export abstract class OrderbookDEX extends EventTarget {
      * @param abortSignal A signal to abort the operation.
      */
     abstract forgetOrderbook(orderbook: Orderbook, abortSignal?: AbortSignal): Promise<void>;
+
+    /**
+     * Format a fee as a percentage.
+     *
+     * @param fee The fee to format.
+     * @returns The formatted value.
+     */
+    formatFeeAsPercentage(fee: bigint): string {
+        return `${formatValue(fee, 16)}%`;
+    }
+
+    /**
+     * Apply a fee to an amount.
+     *
+     * @param amount The amount to parse.
+     * @param fee The fee to apply.
+     * @returns The amount taken as fee.
+     */
+    applyFee(amount: bigint, fee: bigint): bigint {
+        return amount * fee / (10n ** 18n);
+    }
 
     addEventListener(type: OrderbookDEXEventType.TOKEN_ADDED, callback: GenericEventListener<TokenAddedEvent> | null, options?: boolean | AddEventListenerOptions): void;
     addEventListener(type: OrderbookDEXEventType.TOKEN_REMOVED, callback: GenericEventListener<TokenRemovedEvent> | null, options?: boolean | AddEventListenerOptions): void;

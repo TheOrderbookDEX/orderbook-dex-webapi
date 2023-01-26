@@ -1,3 +1,4 @@
+import { formatValue } from '@frugal-wizard/abi2ts-lib';
 import { IOrderbookV1 } from '@theorderbookdex/orderbook-dex-v1/dist/interfaces/IOrderbookV1';
 import { IERC20 } from '@theorderbookdex/orderbook-dex/dist/interfaces/IERC20';
 import { IOrderbookDEXTeamTreasury } from '@theorderbookdex/orderbook-dex/dist/interfaces/IOrderbookDEXTeamTreasury';
@@ -160,6 +161,40 @@ describe('OrderbookDEX', function() {
 
         describe('forgetToken', function() {
             // TODO
+        });
+
+        describe('formatFeeAsPercentage', function() {
+            for (const { fee, formatted } of [
+                { fee:              0n, formatted: '0.0%' },
+                { fee:      10n ** 16n, formatted: '1.0%' },
+                { fee: 2n * 10n ** 16n, formatted: '2.0%' },
+                { fee:      10n ** 15n, formatted: '0.1%' },
+                { fee: 2n * 10n ** 15n, formatted: '0.2%' },
+            ]) {
+                describe(`fee = ${formatValue(fee)}`, function() {
+                    it('should return formatted fee percentage', function() {
+                        expect(OrderbookDEX.instance.formatFeeAsPercentage(fee))
+                            .to.be.equal(formatted);
+                    });
+                });
+            }
+        });
+
+        describe('applyFee', function() {
+            for (const { amount, fee, feeAmount } of [
+                { amount:      10n ** 18n, fee:              0n, feeAmount:              0n },
+                { amount:      10n ** 18n, fee:      10n ** 15n, feeAmount:      10n ** 15n },
+                { amount: 2n * 10n ** 18n, fee:      10n ** 15n, feeAmount: 2n * 10n ** 15n },
+                { amount:      10n ** 18n, fee: 2n * 10n ** 15n, feeAmount: 2n * 10n ** 15n },
+                { amount: 2n * 10n ** 18n, fee: 2n * 10n ** 15n, feeAmount: 4n * 10n ** 15n },
+            ]) {
+                describe(`amount = ${formatValue(amount)} and fee = ${formatValue(fee)}`, function() {
+                    it('should return fee amount', function() {
+                        expect(OrderbookDEX.instance.applyFee(amount, fee))
+                            .to.be.equal(feeAmount);
+                    });
+                });
+            }
         });
     });
 });
