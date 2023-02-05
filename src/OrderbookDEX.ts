@@ -378,10 +378,10 @@ interface OrderbookDEXConfig {
 export const orderbookDEXConfigs: { [chainId: number]: OrderbookDEXConfig | undefined } = {};
 
 orderbookDEXConfigs[5] = {
-    treasury:           '0x0000000000000000000000000000000000000000' as Address,
-    operatorFactory:    '0x8D6d10630a8Cf88519a9C38AA4F486492Bee62D4' as Address,
-    operatorV1:         '0x7baB64F1c9339CCd275209a7ad02cCb9099AF79f' as Address,
-    orderbookFactoryV1: '0x4c05020310E4ffA64620Fd2D419227d4cd8824ac' as Address,
+    treasury:           '0x2062236a0eD977B3B3FeF342880Fc9Dc0C888933' as Address,
+    operatorFactory:    '0x2ce39e616c6d22Ca7EE8813F7Ba1b79a4ab47142' as Address,
+    operatorV1:         '0x88743d6880B6CDf0a6bA2fb9C615d6066780Ba23' as Address,
+    orderbookFactoryV1: '0x3244651771F457975f2d490f6CD78a2AA364E5af' as Address,
     tokens: [
         '0x7FFaFDFD84fdc7EBEbF055AbD32e075013351dac' as Address, // WBTC
         '0xC648b5cEa6bb4707dF69BDB54CdcD1120B164A14' as Address, // WETH
@@ -397,10 +397,10 @@ orderbookDEXConfigs[5] = {
         '0xF7717f2cd227B4Ac266eB10d3225783f0C8B94a2' as Address, // USDT
     ],
     orderbooks: [
-        '0xe8202815Bc6467f250BEB709e38cbFb161bA5c0F' as Address, // WBTC/USDT
-        '0xB7324bb1417A8959e4EEE291b4650223d52e479E' as Address, // WETH/USDT
-        '0x24CB31C2Ba0459Ef60C146D0415AaDe687Ad037A' as Address, //  BNB/USDT
-        '0x7bCF97AeA6ba4070de249F313F23b2aE17f7D205' as Address, // WXRP/USDT
+        '0xD5d3b3bC0bEf88b024FeDA804eC786337C5EB8D7' as Address, // WBTC/USDT
+        '0xEaAa410B31729667A6e95D891293A745478AcB69' as Address, // WETH/USDT
+        '0x6E16cd01548A0CF0332a0034855Cb2B9779e2635' as Address, //  BNB/USDT
+        '0x324138DB862d69F01345cBeBC7685541A6e73eBC' as Address, // WXRP/USDT
     ],
 };
 
