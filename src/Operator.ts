@@ -7,7 +7,7 @@ import { getDevChainFunds } from './dev-chain';
 import { isUserRejectionError } from './ethereum';
 import { Orderbook } from './Orderbook';
 import { createSubAbortController, max, min } from './utils';
-import { ContractEvent, decodeErrorData, MAX_UINT32, Transaction } from '@frugal-wizard/abi2ts-lib';
+import { ContractEvent, decodeErrorData, MAX_UINT32, Transaction } from '@frugalwizard/abi2ts-lib';
 import { IERC20 } from '@theorderbookdex/orderbook-dex/dist/interfaces/IERC20';
 import { IERC20WithFaucet, FaucetOnCooldown as FaucetOnCooldownContractError } from '@theorderbookdex/orderbook-dex/dist/testing/interfaces/IERC20WithFaucet';
 import { Database } from './Database';

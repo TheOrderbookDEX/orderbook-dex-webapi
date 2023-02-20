@@ -1,4 +1,4 @@
-import { getBlockTimestamp } from '@frugal-wizard/abi2ts-lib';
+import { getBlockTimestamp } from '@frugalwizard/abi2ts-lib';
 import { use, expect } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import { OrderbookDEX, OrderType, PricePointAddedEvent, PricePointRemovedEvent, PricePointsEventType, PricePointUpdatedEvent, TimeFrame } from '../src';

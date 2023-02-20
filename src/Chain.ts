@@ -1,7 +1,7 @@
 import { Ethereum, getEthereum } from './ethereum';
 import { Database } from './Database';
 import { ChainEvents } from './ChainEvents';
-import { getBlockTimestamp } from '@frugal-wizard/abi2ts-lib';
+import { getBlockTimestamp } from '@frugalwizard/abi2ts-lib';
 
 /**
  * Connection to the blockchain.

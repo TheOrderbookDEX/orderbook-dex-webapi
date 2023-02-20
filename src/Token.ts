@@ -1,4 +1,4 @@
-import { formatValue, parseValue } from '@frugal-wizard/abi2ts-lib';
+import { formatValue, parseValue } from '@frugalwizard/abi2ts-lib';
 import { Address } from './Address';
 
 /**

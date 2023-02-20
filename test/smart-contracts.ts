@@ -1,9 +1,9 @@
-import { AddressBook } from '@frugal-wizard/addressbook/dist/AddressBook';
+import { AddressBook } from '@frugalwizard/addressbook/dist/AddressBook';
 import { OperatorFactory } from '@theorderbookdex/orderbook-dex-operator/dist/OperatorFactory';
 import { OrderbookFactoryV1 } from '@theorderbookdex/orderbook-dex-v1/dist/OrderbookFactoryV1';
 import { IOrderbookV1 } from '@theorderbookdex/orderbook-dex-v1/dist/interfaces/IOrderbookV1';
 import { IERC20 } from '@theorderbookdex/orderbook-dex/dist/interfaces/IERC20';
-import { createSigner, getAccounts, getBalance, getBlockNumber, getBlockTimestamp, hexstring, Signer } from '@frugal-wizard/abi2ts-lib';
+import { createSigner, getAccounts, getBalance, getBlockNumber, getBlockTimestamp, hexstring, Signer } from '@frugalwizard/abi2ts-lib';
 import { EthereumProvider } from 'ganache';
 import { OperatorV1 } from '@theorderbookdex/orderbook-dex-v1-operator/dist/OperatorV1';
 import { Address, ZERO_ADDRESS } from '../src';

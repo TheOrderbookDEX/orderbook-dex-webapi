@@ -1,4 +1,4 @@
-import { Transaction } from '@frugal-wizard/abi2ts-lib';
+import { Transaction } from '@frugalwizard/abi2ts-lib';
 import { expect, use } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import { Chain, Order, OrderbookDEX, Operator, OperatorEventType } from '../src';

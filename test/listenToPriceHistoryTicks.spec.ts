@@ -10,7 +10,7 @@ import { OrderbookDEX, orderbookDEXConfigs } from '../src/OrderbookDEX';
 import { Database } from '../src/Database';
 import { listenToPriceHistoryTicksScenarios } from './scenarios/listenToPriceHistoryTicks';
 import { ChainEvents } from '../src/ChainEvents';
-import { getBlockNumber } from '@frugal-wizard/abi2ts-lib';
+import { getBlockNumber } from '@frugalwizard/abi2ts-lib';
 import { Address } from '../src/Address';
 
 use(chaiAsPromised);

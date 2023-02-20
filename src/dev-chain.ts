@@ -1,4 +1,4 @@
-import { getAccounts, getBalance, hexstring } from '@frugal-wizard/abi2ts-lib';
+import { getAccounts, getBalance, hexstring } from '@frugalwizard/abi2ts-lib';
 import { ChainInternal } from './Chain';
 
 export interface DevEthereum {

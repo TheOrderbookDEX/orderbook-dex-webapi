@@ -1,4 +1,4 @@
-import { ContractEvent, getBlockNumber } from '@frugal-wizard/abi2ts-lib';
+import { ContractEvent, getBlockNumber } from '@frugalwizard/abi2ts-lib';
 import { abortPromise, createAsyncQueue } from './utils';
 
 const UPDATE_INTERVAL = 15000;

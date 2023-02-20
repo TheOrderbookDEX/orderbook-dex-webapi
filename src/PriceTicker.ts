@@ -4,7 +4,7 @@ import { fetchLast24hsPriceHistoryTicks, fetchPriceHistoryTicks, listenToPriceHi
 import { EventTargetX } from './EventTargetX';
 import { after, now } from './time';
 import { ChainEvents } from './ChainEvents';
-import { getBlockNumber } from '@frugal-wizard/abi2ts-lib';
+import { getBlockNumber } from '@frugalwizard/abi2ts-lib';
 import { Address } from './Address';
 
 export enum PriceTickerEventType {
