@@ -133,11 +133,7 @@ export class ChainNotConnected extends Error {
 }
 
 const chainNames: { [chainId: number]: string | undefined } = {};
-chainNames[1]    = 'Ethereum Mainnet';
-chainNames[3]    = 'Ropsten Testnet';
-chainNames[4]    = 'Rinkeby Testnet';
-chainNames[5]    = 'Goerli Testnet';
-chainNames[42]   = 'Kovan Testnet';
-chainNames[56]   = 'BSC Mainnet';
-chainNames[97]   = 'BSC Testnet';
-chainNames[1337] = 'Development Testnet';
+chainNames[1]        = 'Ethereum Mainnet';
+chainNames[5]        = 'Goerli Testnet';
+chainNames[11155111] = 'Sepolia Testnet';
+chainNames[1337]     = 'Development Testnet';

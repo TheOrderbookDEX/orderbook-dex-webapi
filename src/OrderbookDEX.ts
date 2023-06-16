@@ -404,6 +404,33 @@ orderbookDEXConfigs[5] = {
     ],
 };
 
+orderbookDEXConfigs[11155111] = {
+    treasury:           '0x4a5415FB93edab918d3A1bfF1f9A7f693B264f98' as Address,
+    operatorFactory:    '0x788a6b1582D876c57d7cD74A937b4e508bB58fE6' as Address,
+    operatorV1:         '0xe9E828d1a8C79bdc3eb436f65296Ce62111Ee17e' as Address,
+    orderbookFactoryV1: '0xEB9217a010e0087487C9B8Be84a3A4EfcE09C06B' as Address,
+    tokens: [
+        '0x0A1B9Ee85Ff783f0f641ADc1A6D5838FaE5349DD' as Address, // WBTC
+        '0x0358DA478EBFbC82E20721181Be85Cc7BCBf0bFa' as Address, // WETH
+        '0x7BF5889661f06B7d287C6acBA754d318F17E4A52' as Address, // BNB
+        '0x809dDB3e1Ae4f4b8846A8DE796fBfC0340247A3f' as Address, // WXRP
+        '0xdFbd8e2360B96C0bd4A00d4D1271A33f0C6E75C7' as Address, // USDT
+    ],
+    tokensWithFaucet: [
+        '0x0A1B9Ee85Ff783f0f641ADc1A6D5838FaE5349DD' as Address, // WBTC
+        '0x0358DA478EBFbC82E20721181Be85Cc7BCBf0bFa' as Address, // WETH
+        '0x7BF5889661f06B7d287C6acBA754d318F17E4A52' as Address, // BNB
+        '0x809dDB3e1Ae4f4b8846A8DE796fBfC0340247A3f' as Address, // WXRP
+        '0xdFbd8e2360B96C0bd4A00d4D1271A33f0C6E75C7' as Address, // USDT
+    ],
+    orderbooks: [
+        '0x4072aEbD880aF677CBD8B681EE0F91f7D845633d' as Address, // WBTC/USDT
+        '0x1Dba2243b65F1a6c01358147a559FaA3CB812DeA' as Address, // WETH/USDT
+        '0x009884E0E3085e82512077807f4E0245689f9dF8' as Address, //  BNB/USDT
+        '0x89aAf4548AA101374d00A711AFF154C695d2B2C6' as Address, // WXRP/USDT
+    ],
+};
+
 export const devnetConfig = orderbookDEXConfigs[1337] = {
     treasury:           '0xF2E246BB76DF876Cef8b38ae84130F4F55De395b' as Address,
     operatorFactory:    '0xDe09E74d4888Bc4e65F589e8c13Bce9F71DdF4c7' as Address,
